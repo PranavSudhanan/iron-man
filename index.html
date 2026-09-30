@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Iron Man — The Armored Avenger</title>
+    <meta name="description" content="An interactive 3D fan tribute to Iron Man: the arc reactor, the cave, the workshop, suiting up, flight, the helmet HUD, repulsors, the hall of armor, a new element, a battle over the city, a life's timeline and a quiz." />
+    <meta name="theme-color" content="#04060a" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <canvas id="webgl" aria-label="Interactive 3D scene"></canvas>
+
+    <div id="loader" aria-live="polite">
+      <div class="loader-reactor" aria-hidden="true">
+        <svg class="reactor-svg" viewBox="-50 -50 100 100">
+          <defs>
+            <radialGradient id="rc-a"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#bff6ff"/><stop offset=".7" stop-color="#5fe3ff"/><stop offset="1" stop-color="#0a3a4c"/></radialGradient>
+          </defs>
+          <circle r="47" fill="#0a1017" stroke="#6d7885" stroke-width="2"/>
+          <g class="r-ring"><circle r="40" fill="none" stroke="#5fe3ff" stroke-width="5" stroke-dasharray="8 4.6" opacity=".85"/></g>
+          <g class="r-ring rev"><circle r="31" fill="none" stroke="#1d4a5c" stroke-width="7"/><circle r="31" fill="none" stroke="#a8f1ff" stroke-width="1.2" stroke-dasharray="2 6"/></g>
+          <g class="r-core"><circle r="22" fill="url(#rc-a)"/><path d="M0 -15 L13 7.5 L-13 7.5 Z" fill="none" stroke="#0a3a4c" stroke-width="3" stroke-linejoin="round" opacity=".7"/></g>
+        </svg>
+      </div>
+      <p class="loader-kicker">A fan tribute</p>
+      <h1 class="loader-title">Iron Man</h1>
+      <p class="loader-sub">The Armored Avenger</p>
+      <div class="loader-bar"><i id="loader-progress"></i></div>
+      <button id="enter-btn" class="btn btn-primary" disabled>Booting systems…</button>
+      <p class="loader-hint">Best with sound on · drag, tap, hold and explore everything</p>
+      <p class="loader-legal">Unofficial, non-commercial fan tribute. Not affiliated with or endorsed by Marvel. 3D models by their credited artists (see Credits); sound and music are original and generated in the browser.</p>
+    </div>
+
+    <div id="transition" aria-hidden="true">
+      <div class="t-eye">
+        <svg class="reactor-svg" viewBox="-50 -50 100 100">
+          <defs><radialGradient id="rc-b"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#bff6ff"/><stop offset=".7" stop-color="#5fe3ff"/><stop offset="1" stop-color="#0a3a4c"/></radialGradient></defs>
+          <circle r="47" fill="#0a1017" stroke="#6d7885" stroke-width="2"/>
+          <g class="r-ring"><circle r="40" fill="none" stroke="#5fe3ff" stroke-width="5" stroke-dasharray="8 4.6" opacity=".85"/></g>
+          <g class="r-core" style="opacity:1"><circle r="22" fill="url(#rc-b)"/></g>
+        </svg>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <button class="brand" data-goto="0" aria-label="Back to the start">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">IRON MAN<small>MARK · ARCHIVE</small></span>
+      </button>
+      <div class="topbar-actions">
+        <span id="chapter-count" class="chapter-count">01 / 13</span>
+        <button id="credits-btn" class="icon-btn" aria-label="Credits" title="Credits">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v6M12 7.2v.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+        <button id="music-btn" class="icon-btn" aria-label="Toggle music" aria-pressed="true" title="Music">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M9 18.5a2.5 2.5 0 1 1-2-2.45V5.5l11-2.5v11.5a2.5 2.5 0 1 1-2-2.45V7.4L9 8.9z"/><path class="slash" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button id="sound-btn" class="icon-btn" aria-label="Mute all sound (M)" aria-pressed="true" title="Mute all (M)">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path class="slash" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="wave" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav id="nav" aria-label="Chapters"></nav>
+    <div class="pager">
+      <button id="prev-btn" class="icon-btn" aria-label="Previous chapter">&#8592;</button>
+      <button id="next-btn" class="icon-btn" aria-label="Next chapter">&#8594;</button>
+    </div>
+
+    <main id="hud"></main>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="blood" aria-hidden="true"></div>
+    <canvas id="trail" aria-hidden="true"></canvas>
+    <div id="charge" aria-hidden="true"><svg viewBox="0 0 60 60"><circle class="bg" cx="30" cy="30" r="26"/><circle class="fg" cx="30" cy="30" r="26"/></svg></div>
+    <div id="cursor" aria-hidden="true"></div>
+    <div id="credits" class="credits hidden" role="dialog" aria-modal="true" aria-labelledby="credits-title">
+      <div class="credits-box">
+        <button class="close" id="credits-close" aria-label="Close credits">&#10005;</button>
+        <span class="card-jp">Archive · Credits</span>
+        <h3 id="credits-title">Credits</h3>
+        <p>An unofficial, non-commercial fan tribute. Iron Man and related characters are the property of their owners; this site is not affiliated with or endorsed by Marvel.</p>
+        <h4>3D models</h4>
+        <ul id="credits-models"></ul>
+        <h4>Everything else</h4>
+        <p>Sound effects and music are original, synthesized in the browser. Text written for this site. Effects, environments and the procedural armor are built in code.</p>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

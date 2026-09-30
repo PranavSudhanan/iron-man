@@ -1,0 +1,27 @@
+/* New Element: stats row, charge meter, stage card */
+.chapter-ui[data-id="reactor"] .rx-panel { position: absolute; right: calc(var(--gutter) + 70px); top: 88px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.chapter-ui[data-id="reactor"] .rx-panel .stats { margin: 0; justify-content: flex-end; }
+.chapter-ui[data-id="reactor"] .rx-panel .stat { min-width: 84px; }
+.chapter-ui[data-id="reactor"] .rx-panel .stat.ok { border-left-color: var(--cyan); }
+.chapter-ui[data-id="reactor"] .rx-panel .stat.ok b { color: var(--cyan-2); }
+.chapter-ui[data-id="reactor"] .rx-panel .meter { width: 220px; padding: 8px 12px 10px; border-radius: 8px; background: var(--glass); border: 1px solid var(--line); }
+.chapter-ui[data-id="reactor"] .rx-card { top: auto; bottom: calc(110px + var(--nav-h)); transform: none; width: min(380px, 32vw); }
+.chapter-ui[data-id="reactor"] .rx-card.hidden { transform: translateY(14px); }
+.chapter-ui[data-id="reactor"] .rx-card .card-jp { color: var(--gold-2); }
+.chapter-ui[data-id="reactor"] .rx-card::before { background: var(--gold); box-shadow: 0 0 12px var(--gold); }
+.chapter-ui[data-id="reactor"] .rx-card.final::before { background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.chapter-ui[data-id="reactor"] .rx-card .spec { margin-bottom: 4px; }
+.chapter-ui[data-id="reactor"] .btn[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="reactor"] .rx-panel { right: var(--gutter); left: var(--gutter); top: auto; bottom: calc(66px + var(--nav-h) + env(safe-area-inset-bottom)); flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: stretch; gap: 6px; }
+  .chapter-ui[data-id="reactor"] .rx-panel .stats { flex-wrap: nowrap; gap: 4px; }
+  .chapter-ui[data-id="reactor"] .rx-panel .stat { min-width: 0; padding: 5px 7px; }
+  .chapter-ui[data-id="reactor"] .rx-panel .stat b { font-size: 11px; }
+  .chapter-ui[data-id="reactor"] .rx-panel .stat span { font-size: 9px; letter-spacing: .12em; }
+  .chapter-ui[data-id="reactor"] .rx-panel .meter { width: 108px; padding: 5px 8px 7px; }
+  .chapter-ui[data-id="reactor"] .rx-card { bottom: calc(126px + var(--nav-h) + env(safe-area-inset-bottom)); max-height: 30vh; padding: 12px 14px 8px; }
+  .chapter-ui[data-id="reactor"] .rx-card h3 { font-size: 15px; margin: 2px 0 6px; }
+  .chapter-ui[data-id="reactor"] .rx-card p { font-size: 12.5px; line-height: 1.5; }
+  .chapter-ui[data-id="reactor"] .rx-card .spec { font-size: 12px; }
+}

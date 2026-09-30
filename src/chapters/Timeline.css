@@ -1,0 +1,37 @@
+/* Chronicle (timeline) — extras on top of .timeline-card / .tl-progress */
+.chapter-ui[data-id="timeline"] .timeline-card { width: min(380px, 32vw); }
+.chapter-ui[data-id="timeline"] .tl-head { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 4px; }
+.chapter-ui[data-id="timeline"] .tl-code { display: flex; flex-direction: column; gap: 2px; padding-bottom: 3px; }
+.chapter-ui[data-id="timeline"] .tl-meta { font-family: var(--hud); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.chapter-ui[data-id="timeline"] .tl-replay { display: none; margin-top: 6px; }
+.chapter-ui[data-id="timeline"] .tl-replay.on { display: inline-flex; animation: rise .6s ease both; }
+.chapter-ui[data-id="timeline"] .tl-count { font-variant-numeric: tabular-nums; min-width: 72px; text-align: center; }
+.chapter-ui[data-id="timeline"] .controls .btn { gap: 8px; }
+.chapter-ui[data-id="timeline"] .controls .btn:disabled { opacity: .35; cursor: default; }
+.chapter-ui[data-id="timeline"] .controls .btn span[aria-hidden] { font-size: 18px; line-height: 1; }
+
+/* the year of the current tick, under the progress line */
+.chapter-ui[data-id="timeline"] .tl-ticks button { transition: background .3s, border-color .3s, box-shadow .3s; }
+.chapter-ui[data-id="timeline"] .tl-ticks button:hover { border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.chapter-ui[data-id="timeline"] .tl-ticks button.cur { box-shadow: 0 0 14px var(--cyan); }
+.chapter-ui[data-id="timeline"] .tl-ticks button::before { content: ""; position: absolute; inset: -10px; }
+.chapter-ui[data-id="timeline"] .tl-ticks button.cur::after {
+  content: attr(data-year); position: absolute; left: 50%; top: 18px; transform: rotate(-45deg) translate(-50%, 0); transform-origin: 0 0;
+  font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--cyan-2); white-space: nowrap; pointer-events: none;
+}
+.chapter-ui[data-id="timeline"] .tl-progress i { transition: width .7s cubic-bezier(.2, .8, .2, 1); }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="timeline"] .timeline-card { width: auto; }
+  .chapter-ui[data-id="timeline"] .tl-head { gap: 10px; }
+  .chapter-ui[data-id="timeline"] .tl-meta { font-size: 10px; }
+  .chapter-ui[data-id="timeline"] .tl-replay.on { margin-top: 8px; }
+  /* prev / next sit at the two ends of the progress line */
+  .chapter-ui[data-id="timeline"] .controls { background: none; }
+  .chapter-ui[data-id="timeline"] .controls .group { width: 100%; justify-content: space-between; background: none; border: 0; padding: 0; }
+  .chapter-ui[data-id="timeline"] .controls .btn { width: 46px; min-height: 38px; padding: 0; justify-content: center; border: 1px solid var(--line); background: var(--glass); }
+  .chapter-ui[data-id="timeline"] .controls .btn-primary { background: linear-gradient(135deg, #d7182f, #7a0716); border-color: #ff4a4a; }
+  .chapter-ui[data-id="timeline"] .controls .lbl, .chapter-ui[data-id="timeline"] .tl-count { display: none; }
+  .chapter-ui[data-id="timeline"] .tl-ticks button { width: 10px; height: 10px; margin-left: -5px; top: 1px; }
+  .chapter-ui[data-id="timeline"] .tl-ticks button.cur::after { display: none; }
+}

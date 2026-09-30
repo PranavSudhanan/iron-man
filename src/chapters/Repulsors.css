@@ -1,0 +1,59 @@
+/* Repulsor Range: countdown, score pop-ups, the chest-beam cooldown on its button, the range report */
+.chapter-ui[data-id="repulsors"] .rp-count {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); pointer-events: none;
+  font-family: var(--display); font-weight: 900; font-size: clamp(64px, 13vw, 170px); color: #fff; letter-spacing: .04em;
+  text-shadow: 0 0 34px rgba(95, 227, 255, .9), 0 6px 0 rgba(0, 0, 0, .5); opacity: 0;
+}
+.chapter-ui[data-id="repulsors"] .rp-count.on { animation: rp-count .95s ease-out forwards; }
+.chapter-ui[data-id="repulsors"] .rp-count.go { color: var(--gold-2); text-shadow: 0 0 34px rgba(242, 179, 61, .9), 0 6px 0 rgba(0, 0, 0, .5); }
+@keyframes rp-count {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.92); }
+}
+
+.chapter-ui[data-id="repulsors"] .rp-pop {
+  position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap; opacity: 0;
+  font-family: var(--display); font-weight: 800; font-size: 18px; color: var(--gold-2); letter-spacing: .04em;
+  text-shadow: 0 0 12px rgba(242, 179, 61, .75), 0 2px 0 rgba(0, 0, 0, .6);
+}
+.chapter-ui[data-id="repulsors"] .rp-pop.cyan { color: var(--cyan-2); text-shadow: 0 0 12px rgba(95, 227, 255, .8), 0 2px 0 rgba(0, 0, 0, .6); }
+.chapter-ui[data-id="repulsors"] .rp-pop.on { animation: rp-pop .95s ease-out forwards; }
+@keyframes rp-pop {
+  0% { opacity: 0; translate: -50% 6px; scale: .7; }
+  15% { opacity: 1; translate: -50% 0; scale: 1.1; }
+  100% { opacity: 0; translate: -50% -52px; scale: 1; }
+}
+
+.chapter-ui[data-id="repulsors"] .rp-uni { position: relative; overflow: hidden; }
+.chapter-ui[data-id="repulsors"] .rp-uni .rp-cd {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, #c47c14, var(--gold-2));
+  box-shadow: 0 0 8px rgba(242, 179, 61, .7); transform-origin: left center;
+}
+.chapter-ui[data-id="repulsors"] .rp-uni.cooling { color: var(--muted); }
+.chapter-ui[data-id="repulsors"] .rp-uni.ready { color: var(--gold-2); }
+.chapter-ui[data-id="repulsors"] .rp-uni kbd {
+  font-family: var(--hud); font-size: 10px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted);
+}
+
+.chapter-ui[data-id="repulsors"] .pill.hot b { color: var(--gold-2); text-shadow: 0 0 8px rgba(242, 179, 61, .6); }
+.chapter-ui[data-id="repulsors"] .pill.warn b { color: var(--red-2); }
+
+.chapter-ui[data-id="repulsors"] .rp-kicker { font-family: var(--hud); font-weight: 700; color: var(--cyan); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; }
+.chapter-ui[data-id="repulsors"] .rp-report { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 18px; }
+.chapter-ui[data-id="repulsors"] .rp-report div { padding: 8px 4px; border: 1px solid var(--line); border-radius: 6px; background: rgba(95, 227, 255, .05); }
+.chapter-ui[data-id="repulsors"] .rp-report b { display: block; font-family: var(--display); font-size: 16px; color: #fff; }
+.chapter-ui[data-id="repulsors"] .rp-report span { font-family: var(--hud); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.chapter-ui[data-id="repulsors"] .rp-card-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.chapter-ui[data-id="repulsors"] .game-card .rp-best { color: var(--gold-2); font-family: var(--hud); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; font-size: 12px; margin: 0 0 4px; min-height: 1em; }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="repulsors"] .rp-pop { font-size: 15px; }
+  .chapter-ui[data-id="repulsors"] .hud-corner .opt { display: none; }
+  .chapter-ui[data-id="repulsors"] .hud-corner { gap: 6px; }
+  .chapter-ui[data-id="repulsors"] .hud-corner .meter { width: 110px; }
+  .chapter-ui[data-id="repulsors"] .rp-uni kbd { display: none; }
+  .chapter-ui[data-id="repulsors"] .rp-report { grid-template-columns: repeat(2, 1fr); }
+  .chapter-ui[data-id="repulsors"] .rp-count { top: 36%; }
+}

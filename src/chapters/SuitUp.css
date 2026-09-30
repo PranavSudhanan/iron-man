@@ -1,0 +1,51 @@
+/* Suit Up: the system status panel and the armor picker. */
+
+.chapter-ui[data-id="suitup"] .su-status {
+  right: calc(var(--gutter) + 70px); top: 90px; width: 250px; z-index: 3;
+  transition: border-color .5s, box-shadow .5s;
+}
+.chapter-ui[data-id="suitup"] .su-status.done { border-color: rgba(242, 179, 61, .6); box-shadow: 0 0 24px rgba(242, 179, 61, .18); }
+.chapter-ui[data-id="suitup"] .su-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.chapter-ui[data-id="suitup"] .su-head .hud-text { font-size: 12px; }
+.chapter-ui[data-id="suitup"] .su-head b { font-family: var(--display); font-size: 13px; letter-spacing: .06em; color: var(--gold-2); }
+.chapter-ui[data-id="suitup"] .su-lines { display: flex; flex-direction: column; gap: 5px; }
+.chapter-ui[data-id="suitup"] .su-line {
+  display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px;
+  font-family: var(--hud); font-weight: 600; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  transition: color .3s;
+}
+.chapter-ui[data-id="suitup"] .su-line i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .14); transition: background .3s, box-shadow .3s; }
+.chapter-ui[data-id="suitup"] .su-line b { font-weight: 700; font-size: 11px; letter-spacing: .18em; }
+.chapter-ui[data-id="suitup"] .su-line.on { color: var(--bone); }
+.chapter-ui[data-id="suitup"] .su-line.on i { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.chapter-ui[data-id="suitup"] .su-line.on b { color: var(--cyan); }
+.chapter-ui[data-id="suitup"] .su-line.pending i { background: var(--gold); box-shadow: 0 0 10px var(--gold); animation: su-blink .5s steps(2) infinite; }
+.chapter-ui[data-id="suitup"] .su-line.pending b { color: var(--gold-2); }
+.chapter-ui[data-id="suitup"] .su-meter { width: 100%; margin-top: 12px; }
+.chapter-ui[data-id="suitup"] .su-meter .meter-fill { transition: none; }
+.chapter-ui[data-id="suitup"] .su-state {
+  display: block; margin-top: 10px; font-family: var(--hud); font-weight: 700; font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted);
+}
+.chapter-ui[data-id="suitup"] .su-state.ok { color: var(--gold-2); text-shadow: 0 0 10px rgba(242, 179, 61, .5); }
+.chapter-ui[data-id="suitup"] .su-marks .btn[aria-pressed="true"] { background: rgba(242, 179, 61, .16); border-color: var(--gold); color: #fff; box-shadow: 0 0 16px rgba(242, 179, 61, .3); }
+.chapter-ui[data-id="suitup"] .btn:disabled { opacity: .45; cursor: default; }
+
+@keyframes su-blink { 50% { opacity: .3; } }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="suitup"] .su-status {
+    top: auto; right: var(--gutter); width: 180px; padding: 9px 11px;
+    bottom: calc(var(--ctrl-h, 96px) + 22px + var(--nav-h) + env(safe-area-inset-bottom));
+  }
+  .chapter-ui[data-id="suitup"] .su-head { margin-bottom: 6px; }
+  .chapter-ui[data-id="suitup"] .su-line { font-size: 11px; letter-spacing: .1em; gap: 6px; }
+  .chapter-ui[data-id="suitup"] .su-line b { font-size: 10px; }
+  .chapter-ui[data-id="suitup"] .su-meter { margin-top: 8px; }
+  .chapter-ui[data-id="suitup"] .su-state { margin-top: 6px; font-size: 10px; }
+  .chapter-ui[data-id="suitup"] .su-marks { justify-content: center; }
+  .chapter-ui[data-id="suitup"] .su-marks .btn { padding: 6px 9px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .chapter-ui[data-id="suitup"] .su-status { top: 64px; width: 200px; padding: 8px 10px; }
+  .chapter-ui[data-id="suitup"] .su-line { font-size: 11px; }
+}

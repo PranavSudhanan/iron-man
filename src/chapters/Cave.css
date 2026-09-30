@@ -1,0 +1,38 @@
+/* The Cave: the build log checklist */
+.chapter-ui[data-id="cave"] .cv-card { width: min(340px, 30vw); }
+.chapter-ui[data-id="cave"] .cv-card::before { background: #ff9a3c; box-shadow: 0 0 12px #ff9a3c; }
+.chapter-ui[data-id="cave"] .cv-card .card-jp { color: #ffb068; }
+.chapter-ui[data-id="cave"] .cv-steps { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chapter-ui[data-id="cave"] .cv-steps li {
+  position: relative; display: grid; grid-template-columns: 26px 1fr; column-gap: 10px; align-items: center;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; color: var(--muted);
+  transition: background .35s, border-color .35s, color .35s, opacity .35s; opacity: .6;
+}
+.chapter-ui[data-id="cave"] .cv-steps li i {
+  grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255, 176, 104, .45);
+  display: flex; align-items: center; justify-content: center; font-style: normal; font-family: var(--hud); font-weight: 700; font-size: 12px;
+}
+.chapter-ui[data-id="cave"] .cv-steps li b { font-family: var(--hud); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: inherit; }
+.chapter-ui[data-id="cave"] .cv-steps li span { font-size: 12px; line-height: 1.4; }
+.chapter-ui[data-id="cave"] .cv-steps li.cur { opacity: 1; color: var(--bone); background: rgba(255, 140, 50, .1); border-color: rgba(255, 154, 60, .45); box-shadow: inset 3px 0 0 #ff9a3c; }
+.chapter-ui[data-id="cave"] .cv-steps li.cur i { border-color: #ff9a3c; color: #ffb068; box-shadow: 0 0 12px rgba(255, 154, 60, .5); animation: cvPulse 1.4s ease-in-out infinite; }
+.chapter-ui[data-id="cave"] .cv-steps li.done { opacity: .85; color: #bfeefa; }
+.chapter-ui[data-id="cave"] .cv-steps li.done i { border-color: var(--cyan); background: rgba(95, 227, 255, .18); color: var(--cyan); }
+.chapter-ui[data-id="cave"] .cv-prog { font-family: var(--hud); font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #ffcf9a; margin: 0; min-height: 1.4em; }
+.chapter-ui[data-id="cave"] .cv-bar { height: 4px; margin-top: 6px; background: rgba(255, 255, 255, .08); border-radius: 2px; overflow: hidden; }
+.chapter-ui[data-id="cave"] .cv-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #ff7a1a, #ffd27a); box-shadow: 0 0 10px rgba(255, 154, 60, .6); transition: width .25s; }
+.chapter-ui[data-id="cave"] .cv-bar.cyan > div { background: linear-gradient(90deg, #2bb6ff, var(--cyan)); box-shadow: 0 0 10px rgba(95, 227, 255, .6); }
+.chapter-ui[data-id="cave"] .btn[hidden] { display: none; }
+@keyframes cvPulse { 50% { box-shadow: 0 0 2px rgba(255, 154, 60, .2); } }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="cave"] .cv-card { width: auto; padding: 12px 14px 10px; max-height: 30vh; bottom: calc(70px + var(--nav-h) + env(safe-area-inset-bottom)); }
+  .chapter-ui[data-id="cave"] .cv-card h3 { display: none; }
+  .chapter-ui[data-id="cave"] .cv-steps { flex-direction: row; gap: 4px; margin: 6px 0; }
+  .chapter-ui[data-id="cave"] .cv-steps li { grid-template-columns: 22px; padding: 4px; flex: 0 0 auto; }
+  .chapter-ui[data-id="cave"] .cv-steps li b, .chapter-ui[data-id="cave"] .cv-steps li span { display: none; }
+  .chapter-ui[data-id="cave"] .cv-steps li.cur { flex: 1 1 auto; grid-template-columns: 22px 1fr; }
+  .chapter-ui[data-id="cave"] .cv-steps li.cur b { display: block; font-size: 12px; }
+  .chapter-ui[data-id="cave"] .cv-steps li.cur span { display: block; font-size: 11px; }
+  .chapter-ui[data-id="cave"] .cv-prog { font-size: 11px; }
+}

@@ -1,0 +1,61 @@
+/* Trials (quiz) — extras on top of .quiz */
+.chapter-ui[data-id="trials"] .intro { max-width: min(380px, 30vw); }
+.chapter-ui[data-id="trials"] .q-count { font-family: var(--hud); font-weight: 700; font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--gold); }
+.chapter-ui[data-id="trials"] .q-score { font-family: var(--display); font-size: 13px; letter-spacing: .1em; color: var(--cyan-2); }
+.chapter-ui[data-id="trials"] .option span { flex: 1; }
+.chapter-ui[data-id="trials"] .quiz-foot .btn:disabled { opacity: .4; cursor: default; }
+
+/* the result */
+.chapter-ui[data-id="trials"] .r-view { animation: rise .6s cubic-bezier(.2, .8, .2, 1) both; }
+.chapter-ui[data-id="trials"] .r-head { display: flex; align-items: center; gap: 18px; margin: 10px 0 4px; }
+.chapter-ui[data-id="trials"] .result-score { color: #fff; text-shadow: 0 0 24px rgba(95, 227, 255, .6); white-space: nowrap; }
+.chapter-ui[data-id="trials"] .r-line { color: #cfd9e4; font-size: 13px; line-height: 1.55; margin: 0; }
+.chapter-ui[data-id="trials"] .review { display: none; list-style: none; counter-reset: rv; margin: 14px 0 0; padding: 0; }
+.chapter-ui[data-id="trials"] .review.open { display: grid; gap: 6px; }
+.chapter-ui[data-id="trials"] .review li { counter-increment: rv; padding: 8px 10px 8px 34px; position: relative; border-radius: 6px; background: rgba(255, 255, 255, .03); border-left: 2px solid #3ee08f; font-size: 12.5px; line-height: 1.45; }
+.chapter-ui[data-id="trials"] .review li.bad { border-left-color: var(--red-2); }
+.chapter-ui[data-id="trials"] .review li::before { content: counter(rv, decimal-leading-zero); position: absolute; left: 9px; top: 9px; font-family: var(--display); font-size: 10px; color: var(--muted); }
+.chapter-ui[data-id="trials"] .review b { display: block; font-weight: 600; color: var(--bone); margin-bottom: 2px; }
+.chapter-ui[data-id="trials"] .review span { color: #9fe9c4; }
+.chapter-ui[data-id="trials"] .review s { color: #ff8a8a; }
+.chapter-ui[data-id="trials"] .review em { font-style: normal; color: #9fe9c4; }
+
+/* flip cards */
+.chapter-ui[data-id="trials"] .trivia { margin-top: 18px; }
+.chapter-ui[data-id="trials"] .trivia-label { display: block; font-family: var(--hud); font-weight: 700; font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.chapter-ui[data-id="trials"] .trivia-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chapter-ui[data-id="trials"] .trivia-card { position: relative; height: 150px; padding: 0; border: 0; background: none; cursor: pointer; perspective: 700px; text-align: left; }
+.chapter-ui[data-id="trials"] .tc-inner { position: absolute; inset: 0; display: block; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.chapter-ui[data-id="trials"] .trivia-card.flipped .tc-inner { transform: rotateY(180deg); }
+.chapter-ui[data-id="trials"] .tc-front, .chapter-ui[data-id="trials"] .tc-back {
+  position: absolute; inset: 0; display: flex; flex-direction: column; border-radius: 8px; padding: 10px;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 1px solid rgba(95, 227, 255, .3);
+}
+.chapter-ui[data-id="trials"] .tc-front { justify-content: space-between; background: linear-gradient(160deg, rgba(95, 227, 255, .14), rgba(5, 12, 20, .9)); }
+.chapter-ui[data-id="trials"] .tc-front i { font-style: normal; font-family: var(--display); font-size: 18px; font-weight: 900; color: var(--gold); }
+.chapter-ui[data-id="trials"] .tc-front b { font-family: var(--hud); font-size: 14px; line-height: 1.2; text-transform: uppercase; letter-spacing: .06em; }
+.chapter-ui[data-id="trials"] .tc-front small { font-size: 10px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+.chapter-ui[data-id="trials"] .tc-back { transform: rotateY(180deg); background: rgba(8, 20, 30, .98); font-size: 11.5px; line-height: 1.45; color: #d8e2ec; overflow: auto; border-color: var(--gold); }
+.chapter-ui[data-id="trials"] .trivia-card:hover .tc-front { border-color: var(--cyan); }
+.chapter-ui[data-id="trials"] .trivia-card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="trials"] .intro { max-width: none; }
+  .chapter-ui[data-id="trials"] .intro .gestures { display: none; }
+  .chapter-ui[data-id="trials"] .quiz { max-height: 52vh; padding: 14px; }
+  .chapter-ui[data-id="trials"] .quiz-top { margin-bottom: 8px; }
+  .chapter-ui[data-id="trials"] .quiz-dots i { width: 12px; }
+  .chapter-ui[data-id="trials"] .quiz h3 { font-size: 16px; margin-bottom: 10px; }
+  /* answers in a 2 × 2 grid so the suit keeps the top of the screen */
+  .chapter-ui[data-id="trials"] .options { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .chapter-ui[data-id="trials"] .option { padding: 9px 9px; font-size: 12.5px; line-height: 1.25; gap: 7px; min-height: 48px; }
+  .chapter-ui[data-id="trials"] .option kbd { display: none; }
+  .chapter-ui[data-id="trials"] .option:hover:not(:disabled) { transform: none; }
+  .chapter-ui[data-id="trials"] .explain { margin-top: 10px; font-size: 12px; padding: 8px 10px; }
+  .chapter-ui[data-id="trials"] .quiz-foot { margin-top: 10px; }
+  .chapter-ui[data-id="trials"] .result-score { font-size: 42px; }
+  .chapter-ui[data-id="trials"] .result-rank { font-size: 18px; }
+  .chapter-ui[data-id="trials"] .trivia-row { grid-template-columns: 1fr; }
+  .chapter-ui[data-id="trials"] .trivia-card { height: 96px; }
+  .chapter-ui[data-id="trials"] .combo { top: 16%; }
+}

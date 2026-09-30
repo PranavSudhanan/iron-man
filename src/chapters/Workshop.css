@@ -1,0 +1,80 @@
+/* The Workshop: systems list, scan readout, card tweaks. */
+
+.chapter-ui[data-id="workshop"] .ws-systems {
+  position: absolute; left: var(--gutter); bottom: calc(max(22px, env(safe-area-inset-bottom)) + var(--nav-h) + 76px);
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px;
+  border-radius: 12px; background: var(--glass); border: 1px solid var(--line); width: 230px;
+}
+.chapter-ui[data-id="workshop"] .ws-label {
+  font-family: var(--hud); font-weight: 700; font-size: 11px; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--muted); padding: 2px 6px 4px;
+}
+.chapter-ui[data-id="workshop"] .ws-systems .btn {
+  justify-content: flex-start; border-color: transparent; background: transparent; text-align: left; gap: 10px;
+}
+.chapter-ui[data-id="workshop"] .ws-systems .btn i {
+  font-style: normal; font-size: 10px; color: var(--cyan); letter-spacing: .12em; opacity: .75; min-width: 44px;
+}
+.chapter-ui[data-id="workshop"] .ws-systems .btn[aria-pressed="true"] {
+  background: rgba(242, 179, 61, .16); border-color: var(--gold); box-shadow: 0 0 18px rgba(242, 179, 61, .3); color: #fff;
+}
+.chapter-ui[data-id="workshop"] .ws-systems .btn[aria-pressed="true"] i { color: var(--gold-2); opacity: 1; }
+
+.chapter-ui[data-id="workshop"] .ws-card::before { background: var(--gold); box-shadow: 0 0 12px var(--gold); }
+.chapter-ui[data-id="workshop"] .ws-card .card-jp { color: var(--gold-2); }
+
+.chapter-ui[data-id="workshop"] .ws-scan {
+  right: calc(var(--gutter) + 70px); top: 88px; width: 260px;
+  transition: opacity .4s ease, transform .4s ease;
+}
+.chapter-ui[data-id="workshop"] .ws-scan.hidden { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+.chapter-ui[data-id="workshop"] .ws-scan-title { font-size: 13px; margin-bottom: 8px; }
+.chapter-ui[data-id="workshop"] .ws-scan .meter-track { margin-bottom: 8px; }
+.chapter-ui[data-id="workshop"] .ws-scan .meter-fill { transition: none; }
+.chapter-ui[data-id="workshop"] .ws-row { display: flex; justify-content: space-between; gap: 12px; opacity: .35; transition: opacity .3s, color .3s; }
+.chapter-ui[data-id="workshop"] .ws-row.on { opacity: 1; }
+.chapter-ui[data-id="workshop"] .ws-row.warn, .chapter-ui[data-id="workshop"] .ws-row.warn b { color: var(--gold-2); }
+.chapter-ui[data-id="workshop"] .ws-row.warn b::after { content: " · check"; font-family: var(--hud); font-size: 11px; letter-spacing: .12em; }
+.chapter-ui[data-id="workshop"] .ws-scan-status {
+  margin-top: 8px; font-family: var(--hud); font-weight: 700; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted);
+}
+.chapter-ui[data-id="workshop"] .ws-scan-status.done { color: var(--cyan); text-shadow: 0 0 8px rgba(95, 227, 255, .6); }
+.chapter-ui[data-id="workshop"] .ws-zoom .btn { min-width: 40px; font-size: 18px; }
+
+body.cinema .chapter-ui[data-id="workshop"] .ws-systems { opacity: 0; pointer-events: none; }
+
+@media (max-height: 760px) and (min-width: 761px) {
+  .chapter-ui[data-id="workshop"] .ws-systems { width: auto; flex-direction: row; flex-wrap: wrap; max-width: 46vw; bottom: calc(max(22px, env(safe-area-inset-bottom)) + var(--nav-h) + 70px); }
+  .chapter-ui[data-id="workshop"] .ws-label { width: 100%; }
+  .chapter-ui[data-id="workshop"] .ws-systems .btn i { display: none; }
+}
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="workshop"] .ws-systems {
+    left: var(--gutter); right: var(--gutter); width: auto; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+    padding: 5px; gap: 4px; scrollbar-width: none;
+    bottom: calc(var(--ctrl-h, 52px) + 20px + var(--nav-h) + env(safe-area-inset-bottom));
+  }
+  .chapter-ui[data-id="workshop"] .ws-systems::-webkit-scrollbar { display: none; }
+  .chapter-ui[data-id="workshop"] .ws-label { display: none; }
+  .chapter-ui[data-id="workshop"] .ws-systems .btn { flex: none; min-height: 34px; padding: 6px 10px; }
+  .chapter-ui[data-id="workshop"] .ws-systems .btn i { display: none; }
+  .chapter-ui[data-id="workshop"] .ws-card {
+    bottom: calc(var(--ctrl-h, 52px) + 72px + var(--nav-h) + env(safe-area-inset-bottom)); max-height: 34vh; padding: 14px 16px 12px;
+  }
+  .chapter-ui[data-id="workshop"] .ws-card h3 { font-size: 16px; margin: 4px 0 6px; }
+  .chapter-ui[data-id="workshop"] .ws-card p { font-size: 13px; line-height: 1.5; }
+  .chapter-ui[data-id="workshop"] .ws-scan {
+    top: auto; right: var(--gutter); left: auto; width: 210px; padding: 10px 12px;
+    bottom: calc(var(--ctrl-h, 52px) + 72px + var(--nav-h) + env(safe-area-inset-bottom));
+  }
+  .chapter-ui[data-id="workshop"] .ws-scan .readout { font-size: 11px; line-height: 1.5; }
+}
+/* with the diagnostic scan open (top right), the system card sits below it instead of across it */
+@media (min-width: 761px) {
+  .chapter-ui[data-id="workshop"]:has(.ws-scan:not(.hidden)) .ws-card { top: 312px; transform: none; max-height: calc(100vh - 312px - 96px); }
+}
+@media (max-width: 760px) {
+  /* phones: both sit in the same bottom slot; an open system card takes it, the scan steps back */
+  .chapter-ui[data-id="workshop"]:has(.ws-card:not(.hidden)) .ws-scan { opacity: 0; pointer-events: none; }
+}

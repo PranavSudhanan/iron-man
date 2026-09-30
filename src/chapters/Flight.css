@@ -1,0 +1,110 @@
+/* ---------- First Flight: flight instruments, frost, ring guidance ---------- */
+
+.chapter-ui[data-id="flight"] .fl-frost {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; --ice: 0;
+  background-color: rgba(200, 228, 255, .08);
+  background-size: 512px 512px;
+  box-shadow: inset 0 0 calc(40px + var(--ice) * 180px) rgba(220, 240, 255, .55);
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent calc(62% - var(--ice) * 40%), #000 calc(98% - var(--ice) * 30%));
+  mask-image: radial-gradient(ellipse at center, transparent calc(62% - var(--ice) * 40%), #000 calc(98% - var(--ice) * 30%));
+}
+
+.chapter-ui[data-id="flight"] .fl-dock {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(max(22px, env(safe-area-inset-bottom)) + var(--nav-h) + var(--ctrl-h, 56px) + 14px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+  width: min(560px, calc(100% - 32px));
+}
+.chapter-ui[data-id="flight"] .fl-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.chapter-ui[data-id="flight"] .fl-pills .pill { padding: 5px 11px; font-size: 11px; }
+.chapter-ui[data-id="flight"] .fl-pills .pill b { font-size: 13px; min-width: 3.2em; display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
+.chapter-ui[data-id="flight"].fl-free .fl-pills .pill:nth-child(n+2) { display: none; }
+
+.chapter-ui[data-id="flight"] .fl-compass { position: relative; width: 300px; height: 40px; }
+.chapter-ui[data-id="flight"] .fl-compass canvas {
+  width: 300px; height: 32px; display: block;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  filter: drop-shadow(0 0 4px rgba(95, 227, 255, .6));
+}
+.chapter-ui[data-id="flight"] .fl-heading {
+  position: absolute; left: 50%; top: -18px; transform: translateX(-50%);
+  font-family: var(--display); font-size: 12px; letter-spacing: .08em; color: var(--gold-2);
+  text-shadow: 0 0 8px rgba(242, 179, 61, .6);
+}
+
+.chapter-ui[data-id="flight"] .fl-row { display: flex; align-items: flex-end; gap: 14px; }
+.chapter-ui[data-id="flight"] .fl-inst { position: relative; min-width: 128px; padding: 8px 12px 9px; font-family: var(--hud); color: var(--cyan-2); }
+.chapter-ui[data-id="flight"] .fl-inst .fl-lbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: .3em; color: var(--muted); }
+.chapter-ui[data-id="flight"] .fl-inst b { font-family: var(--display); font-size: 24px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(95, 227, 255, .6); }
+.chapter-ui[data-id="flight"] .fl-inst small { font-size: 12px; letter-spacing: .12em; color: var(--cyan); }
+.chapter-ui[data-id="flight"] .fl-mach { display: block; font-size: 12px; font-weight: 700; letter-spacing: .22em; color: var(--gold-2); }
+.chapter-ui[data-id="flight"] .fl-alt { padding-right: 24px; }
+.chapter-ui[data-id="flight"] .fl-ceil { position: absolute; right: 9px; top: 9px; bottom: 9px; width: 4px; background: rgba(255, 255, 255, .1); }
+.chapter-ui[data-id="flight"] .fl-ceil::before { content: ""; position: absolute; left: -3px; right: -3px; top: 0; height: 2px; background: var(--red-2); box-shadow: 0 0 6px var(--red-2); }
+.chapter-ui[data-id="flight"] .fl-ceil i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform-origin: bottom; transform: scaleY(0); background: linear-gradient(0deg, var(--cyan), #e8f6ff); box-shadow: 0 0 6px var(--cyan); }
+.chapter-ui[data-id="flight"] .fl-alt.warn { border-color: rgba(255, 59, 59, .8); animation: fl-warn .6s steps(2) infinite; }
+.chapter-ui[data-id="flight"] .fl-alt.warn b { color: #ffd0d0; text-shadow: 0 0 10px rgba(255, 59, 59, .8); }
+.chapter-ui[data-id="flight"] .fl-energy { width: 150px; padding-bottom: 10px; }
+@keyframes fl-warn { 50% { background: rgba(120, 10, 20, .55); } }
+
+/* the next ring */
+.chapter-ui[data-id="flight"] .fl-marker, .chapter-ui[data-id="flight"] .fl-arrow {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
+}
+.chapter-ui[data-id="flight"] .fl-marker.on, .chapter-ui[data-id="flight"] .fl-arrow.on { opacity: 1; }
+.chapter-ui[data-id="flight"] .fl-marker::before {
+  content: ""; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; transform: rotate(45deg);
+  border: 2px solid var(--gold); box-shadow: 0 0 10px rgba(242, 179, 61, .8);
+}
+.chapter-ui[data-id="flight"] .fl-marker span, .chapter-ui[data-id="flight"] .fl-arrow span {
+  position: absolute; left: 50%; top: 16px; transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--hud); font-weight: 700; font-size: 12px; letter-spacing: .14em; color: var(--gold-2); text-shadow: 0 0 6px rgba(0, 0, 0, .9);
+}
+.chapter-ui[data-id="flight"] .fl-arrow i {
+  position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; display: block;
+}
+.chapter-ui[data-id="flight"] .fl-arrow i::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--gold); filter: drop-shadow(0 0 8px rgba(242, 179, 61, .9));
+  clip-path: polygon(100% 50%, 20% 5%, 38% 50%, 20% 95%);
+  animation: fl-nudge 1s ease-in-out infinite;
+}
+.chapter-ui[data-id="flight"] .fl-arrow span { top: 22px; }
+@keyframes fl-nudge { 50% { transform: translateX(5px); } }
+
+.chapter-ui[data-id="flight"] .fl-stall {
+  position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity .3s;
+}
+.chapter-ui[data-id="flight"] .fl-stall.on { opacity: 1; animation: fl-blink .7s steps(2) infinite; }
+.chapter-ui[data-id="flight"] .fl-stall b { display: block; font-family: var(--display); font-size: clamp(22px, 3.4vw, 40px); letter-spacing: .12em; text-transform: uppercase; color: #fff; text-shadow: 0 0 20px rgba(200, 235, 255, .9), 0 0 4px rgba(255, 59, 59, .9); }
+.chapter-ui[data-id="flight"] .fl-stall span { font-family: var(--hud); font-weight: 700; font-size: 13px; letter-spacing: .3em; text-transform: uppercase; color: var(--red-2); }
+@keyframes fl-blink { 50% { opacity: .55; } }
+
+.chapter-ui[data-id="flight"] .game-card .card-jp { font-family: var(--hud); font-weight: 700; color: var(--cyan); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; }
+.chapter-ui[data-id="flight"] .game-card p b { color: var(--gold-2); }
+.chapter-ui[data-id="flight"] .fl-card-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.chapter-ui[data-id="flight"] .fl-boost { min-width: 120px; touch-action: none; }
+.chapter-ui[data-id="flight"] .fl-boost.active { box-shadow: 0 0 26px rgba(242, 179, 61, .8); transform: scale(.97); }
+.chapter-ui[data-id="flight"] .combo { top: 20%; }
+
+@media (max-width: 760px) {
+  .chapter-ui[data-id="flight"] .fl-dock { gap: 5px; bottom: calc(12px + var(--nav-h) + env(safe-area-inset-bottom) + var(--ctrl-h, 52px) + 8px); }
+  .chapter-ui[data-id="flight"] .fl-compass { width: 220px; height: 30px; }
+  .chapter-ui[data-id="flight"] .fl-compass canvas { width: 220px; height: 24px; }
+  .chapter-ui[data-id="flight"] .fl-heading { top: -14px; font-size: 10px; }
+  .chapter-ui[data-id="flight"] .fl-row { gap: 6px; align-items: stretch; }
+  .chapter-ui[data-id="flight"] .fl-inst { min-width: 0; padding: 5px 8px 6px; }
+  .chapter-ui[data-id="flight"] .fl-alt { padding-right: 18px; }
+  .chapter-ui[data-id="flight"] .fl-ceil { right: 6px; top: 6px; bottom: 6px; width: 3px; }
+  .chapter-ui[data-id="flight"] .fl-inst b { font-size: 17px; }
+  .chapter-ui[data-id="flight"] .fl-inst small { font-size: 10px; }
+  .chapter-ui[data-id="flight"] .fl-inst .fl-lbl, .chapter-ui[data-id="flight"] .fl-mach { font-size: 10px; letter-spacing: .14em; }
+  .chapter-ui[data-id="flight"] .fl-energy { width: 84px; padding-bottom: 6px; align-self: flex-end; }
+  .chapter-ui[data-id="flight"] .fl-energy .meter-label { font-size: 10px; letter-spacing: .1em; }
+  .chapter-ui[data-id="flight"] .fl-pills .pill { padding: 4px 8px; font-size: 10px; }
+  .chapter-ui[data-id="flight"] .fl-pills .pill b { font-size: 11px; }
+  .chapter-ui[data-id="flight"] .fl-boost { min-width: 96px; }
+  .chapter-ui[data-id="flight"] .fl-stall { top: 38%; }
+}
