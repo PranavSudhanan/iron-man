@@ -175,7 +175,17 @@ export class AutoRig {
   /** Arms relaxed at the sides: hanging, a little out, elbows softly bent, hands turned in. */
   relax(s, snap = 0) {
     const S = s === 'l' ? 1 : -1;
-    this._aim(s, new THREE.Vector3(S * 0.16, -1, -0.02), new THREE.Vector3(S * 0.07, -1, 0.2), new THREE.Vector3(S * 0.02, -1, 0.14), snap);
+    // (the upper arm stays a little away from the body so the shoulder keeps its width; the elbow bends
+    // softly forward and the hand hangs in line with it, turned slightly in)
+    // (the two sides not quite alike: a symmetrical stance reads as a mannequin)
+    const r = s === 'r';
+    this._aim(s, new THREE.Vector3(S * (r ? 0.26 : 0.32), -1, r ? 0.02 : -0.06), new THREE.Vector3(S * (r ? 0.14 : 0.08), -1, r ? 0.46 : 0.3), new THREE.Vector3(S * (r ? -0.06 : 0.0), -1, r ? 0.36 : 0.18), snap);
+  }
+
+  /** The wrist raised in front of the chest, forearm across, as if checking the web-shooter on it. */
+  checkWrist(s) {
+    const S = s === 'l' ? 1 : -1;
+    this._aim(s, new THREE.Vector3(S * 0.22, -0.62, 0.75), new THREE.Vector3(-S * 0.28, 0.5, 0.82), new THREE.Vector3(-S * 0.42, 0.35, 0.84), 0);
   }
 
   /** An arm pointing along dirRoot (in the root's space), the wrist cocked back by `wrist` (radians). */

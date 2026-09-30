@@ -67,6 +67,8 @@ export const MODELS = {
   },
   spider: {
     file: 'homecoming.glb', height: 1.72, yaw: 0, glow: false,
+    // its cloth was exported as 40-80% metal (it read as shiny plastic): woven fabric instead
+    fabric: /^Spider-man_HC/,
     title: 'Homecoming Suit', author: 'supplied model (purchased by the site owner)', license: 'purchased', source: '',
   },
   helmetA: {
@@ -108,8 +110,29 @@ export function prefetchModels(keys) { keys.forEach((k) => fetchBinary(BASE + MO
 export function hasModel(key) { return _ready.has(key); }
 
 function prepare(gltf, cfg = {}) {
+  const fabrics = new Map();
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
+    // fabric: no metal, a soft sheen across the weave, the stitched web lines raised in the normal map
+    if (cfg.fabric) {
+      const swap = (m) => {
+        if (!cfg.fabric.test(m.name || '')) return m;
+        if (!fabrics.has(m)) {
+          const f = new THREE.MeshPhysicalMaterial({
+            name: m.name, map: m.map, normalMap: m.normalMap, normalScale: new THREE.Vector2(1.6, 1.6),
+            roughnessMap: m.roughnessMap, aoMap: m.aoMap, color: m.color, roughness: 0.9, metalness: 0,
+            sheen: 0.3, sheenRoughness: 0.6, sheenColor: new THREE.Color(0.4, 0.16, 0.16),
+          });
+          if (m.normalMap && m.normalScale.y < 0) f.normalScale.y *= -1;
+          // deeper, richer dyes (the texture was painted for a brighter viewer), the web lines darker with them
+          f.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = pow(diffuseColor.rgb, vec3(1.25));'); };
+          f.customProgramCacheKey = () => 'fabric';
+          fabrics.set(m, f);
+        }
+        return fabrics.get(m);
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    }
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
       // bare: the paint stripped off, every painted panel the same raw steel as the rest (keeping each
       // panel's own roughness and normal maps, so the wear and panel lines stay)

@@ -828,6 +828,7 @@ export class Protege extends Chapter {
   /** Turn toward the point, raise the hand on that side (wrist cocked back), then fire when the arm is up. */
   _shootWeb(point, normal) {
     if (!this.spRig) { this._fireWeb(point, normal); return; }
+    this._checking = 0; // (a shot takes over from the idle wrist check)
     const root = this.spider.root;
     // his body turns part of the way when the point is well off to a side or behind him
     const toP = this._v.subVectors(point, root.position);
@@ -1067,8 +1068,20 @@ export class Protege extends Chapter {
         root.updateMatrixWorld(true);
         this._fireWeb(pnd.point, pnd.normal);
       }
+      // now and then, when nothing else is going on, he checks the web-shooter on his right wrist
+      this._idleT = (this._idleT ?? 6) - dt;
+      if (this._idleT <= 0 && !this.web.on && !this._webPending && this._lookDefault !== false) {
+        this.spRig.checkWrist('r');
+        this._checking = 1.8;
+        this._idleT = 11 + Math.random() * 6;
+      }
+      if (this._checking > 0) {
+        this._checking -= dt;
+        this.spRig.lookAt(this.spRig.wristWorld('r', this._v3));
+        if (this._checking <= 0) this.spRig.relax('r');
+      }
       // he watches his mentor once he is here, otherwise looks out over the city now and then
-      if (this._lookDefault !== false) {
+      else if (this._lookDefault !== false) {
         if (this.state !== 'away' && this.rig.visible) this.spRig.lookAt(this.rig.getWorldPosition(this._v3).setY(this.rig.position.y + 0.7));
         else this.spRig.lookAt(this._v3.copy(root.position).add(this._v2.set(Math.sin(SP_YAW + Math.sin(t * 0.13) * 0.7) * 10, 1.4 + Math.sin(t * 0.21) * 0.4, Math.cos(SP_YAW + Math.sin(t * 0.13) * 0.7) * 10)));
       }
