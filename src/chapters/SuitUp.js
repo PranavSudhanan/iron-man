@@ -16,7 +16,7 @@ import { rand, damp, clamp, TAU, h, drawTexture, shared, easeInOut } from '../co
 
 /*
  * Suit up: an industrial assembly bay (sealed concrete, painted steel columns and trusses, clerestory
- * windows, high-bay lamps) with a tread-plate turntable under a steel gantry of painted robot arms. Pick an armor, press Suit up (or hold anywhere):
+ * windows, high-bay lamps) with a tread-plate turntable in a cell of four floor-mounted robots and their parts racks. Pick an armor, press Suit up (or hold anywhere):
  * the Mark III's 212 plates fly in and lock on one by one while the arms fit them, the plated suits are
  * welded on from the boots up behind a glowing seam, and the nanotech suits flow out from the chest. Then the eyes and reactor light, the systems report
  * in, and the whole suit lifts off the platform on its boot jets. Reset takes it all off again.
@@ -25,14 +25,15 @@ import { rand, damp, clamp, TAU, h, drawTexture, shared, easeInOut } from '../co
 
 // Every armor is one of the supplied GLB models, shown as authored. mode: 'plates' flies its separate plates
 // in, 'rise' reveals it from the boots up behind a welding seam, 'flow' grows it out of the chest (nanites).
-// size: shown height in metres when it differs from the model's own (the Hulkbuster must fit the gantry).
+// size: shown height in metres when it differs from the model's own (the Hulkbuster must fit the cell).
 const MARKS = [
-  { key: 'mk1', name: 'Mark I', mode: 'rise', time: 5.4, warm: true, label: 'Welds' },
-  { key: 'mk5', name: 'Mark V', mode: 'rise', time: 5.0, warm: true, label: 'Plating' },
-  { key: 'mk5raw', name: 'Prototype', mode: 'rise', time: 5.0, warm: true, label: 'Plating' },
+  // (sections: fitted piece by piece by the robots, like an assembly line; torsoHalf: where the arms begin)
+  { key: 'mk1', name: 'Mark I', mode: 'plates', sections: { torsoHalf: 0.3 }, time: 13, warm: true, label: 'Sections' },
+  { key: 'mk5', name: 'Mark V', mode: 'plates', sections: { torsoHalf: 0.22 }, time: 13, warm: true, label: 'Sections' },
+  { key: 'mk5raw', name: 'Prototype', mode: 'plates', sections: { torsoHalf: 0.22 }, time: 13, warm: true, label: 'Sections' },
   { key: 'mk42', name: 'Mark XLII', mode: 'rise', time: 4.6, warm: true, label: 'Plating' },
-  { key: 'tpose', name: 'Mark III', mode: 'plates', time: 6.5, label: 'Plates' },
-  { key: 'classic', name: 'Classic', mode: 'rise', time: 5.0, warm: true, label: 'Plating' },
+  { key: 'tpose', name: 'Mark III', mode: 'plates', sections: { torsoHalf: 0.22 }, time: 13, label: 'Sections' },
+  { key: 'classic', name: 'Classic', mode: 'plates', sections: { torsoHalf: 0.21 }, time: 13, warm: true, label: 'Sections' },
   { key: 'nano', name: 'Mark 50', mode: 'flow', time: 4.2, label: 'Nanites' },
   { key: 'mk85', name: 'Mark 85', mode: 'flow', time: 4.6, label: 'Nanites' },
   { key: 'heavy', name: 'Hulkbuster', mode: 'rise', time: 6.2, warm: true, label: 'Plating', size: 2.55, frame: false },
@@ -41,8 +42,23 @@ const SPEC = Object.fromEntries(MARKS.map((m) => [m.key, m]));
 const SYSTEM_LINES = [['Power', 0.06], ['Hydraulics', 0.28], ['Flight', 0.5], ['Weapons', 0.72], ['HUD', 0.93]];
 const REMOVE_TIME = 2.4;
 const PLATFORM_Y = 0.14;
-const ARM_ANGLES = [Math.PI / 6, Math.PI * 5 / 6, Math.PI * 7 / 6, Math.PI * 11 / 6];
-const ARM_R = 2.0, MOUNT_Y = 3.1, MAST = 0.4, L1 = 1.3, L2 = 1.3;
+// the assembly cell: four floor-mounted six-axis robots round the platform (two at its sides, a little
+// forward, two behind: the front stays open for the camera), a parts rack beside each.
+// Robot 0 right (+x; the suit's left is +x), 1 left, 2 back-left, 3 back-right.
+const ROBOT_ANGLES = [8, 172, 225, 315].map((d) => d * Math.PI / 180);
+const RACK_ANGLES = [352, 188, 245, 295].map((d) => d * Math.PI / 180);
+const ROBOT_R = 2.2, RACK_R = 3.1, SHOULDER_Y = 1.0, L1 = 1.25, L2 = 1.2, TOOL = 0.3;
+const SHELVES = [0.36, 1.12]; // the racks' deck heights
+// which robot fits which section, and when its slot starts (0..1 of the build; each slot is SLOT long).
+// A robot's slots follow one another; the four work in parallel, and nothing is fitted before what it
+// hangs on: the legs, the pelvis, the chest and back, the arms down to the gloves, the helmet, the faceplate.
+const SLOT = 0.13;
+const PLAN = {
+  bootL: [0, 0.0], shinL: [0, 0.13], thighL: [0, 0.26], chest: [0, 0.42], face: [0, 0.86],
+  bootR: [1, 0.02], shinR: [1, 0.15], thighR: [1, 0.28], helmet: [1, 0.72],
+  pelvis: [2, 0.3], upperR: [2, 0.56], foreR: [2, 0.69], handR: [2, 0.82],
+  back: [3, 0.43], upperL: [3, 0.56], foreL: [3, 0.69], handL: [3, 0.82],
+};
 
 export class SuitUp extends Chapter {
   constructor(app) {
@@ -75,12 +91,12 @@ export class SuitUp extends Chapter {
   build() {
     const s = this.scene;
     // the far end of the bay dissolves into a grey haze of the same colour (no black void)
-    const haze = 0x121416;
+    const haze = 0x1b1e22;
     s.background = new THREE.Color(haze);
     s.fog = new THREE.Fog(haze, 13, 38);
     // a photographed machine shop for reflections and ambient; the bay's own lamps dominate
     s.environment = envMap(HDRIS.shop) || suitEnvironment();
-    s.environmentIntensity = 0.38;
+    s.environmentIntensity = 0.5;
     // surface grit shared by the painted and bare metals: the concrete set's roughness and normal detail
     const grit = pbr('concrete_floor_worn_001', { repeat: 2 });
     this._grit = { rough: grit.roughnessMap || null, nor: grit.normalMap || null };
@@ -127,7 +143,7 @@ export class SuitUp extends Chapter {
     const low = this.app.low;
     RectAreaLightUniformsLib.init();
     // sky light from the clerestory windows, bounce off the concrete
-    s.add(new THREE.HemisphereLight(0xc4ccd6, 0x2c2824, 0.14));
+    s.add(new THREE.HemisphereLight(0xc4ccd6, 0x2c2824, 0.32));
     // the high-bay lamp cluster straight over the platform: a big soft box
     const high = new THREE.RectAreaLight(0xfff1e0, 3.2, 3, 3);
     high.position.set(0, 7.9, 0); high.lookAt(0, 0, 0);
@@ -200,7 +216,7 @@ export class SuitUp extends Chapter {
     decal(lineMat, lines, 0.002);
 
     /* -- the walls: board-marked concrete, steel columns, clerestory windows -- */
-    const wallMat = pbr('concrete_floor_worn_001', { repeat: [7, 3.2], color: 0x4c4f55, roughness: 1, metalness: 0, fallback: 0x3a3c40 });
+    const wallMat = pbr('concrete_floor_worn_001', { repeat: [7, 3.2], color: 0x686b70, roughness: 1, metalness: 0, fallback: 0x3a3c40 });
     const room = new THREE.Group();
     const cols = [], panes = [], mullions = [], rails = [];
     const wallT = new THREE.Object3D();
@@ -328,35 +344,6 @@ export class SuitUp extends Chapter {
     add(new THREE.CircleGeometry(1.4, 96).rotateX(-Math.PI / 2), tread, 0, PLATFORM_Y, 0, { cast: false });
     add(new THREE.TorusGeometry(1.4, 0.012, 6, 120), M.steel, 0, PLATFORM_Y, 0, { rx: Math.PI / 2, cast: false });
 
-    /* -- the gantry: four I-beam columns, a header frame, a box-section ring the arms ride on -- */
-    const lathe = (r0, r1, y0, y1) => new THREE.LatheGeometry([[r0, y0], [r1, y0], [r1, y1], [r0, y1], [r0, y0]].map(([r, y]) => new THREE.Vector2(r, y)), 96);
-    add(lathe(ARM_R - 0.11, ARM_R + 0.11, -0.1, 0.1), M.gantry, 0, MOUNT_Y, 0);
-    add(lathe(ARM_R - 0.03, ARM_R + 0.03, -0.13, -0.1), M.steel, 0, MOUNT_Y, 0, { cast: false });
-    const pill = [];
-    for (let i = 0; i < 4; i++) {
-      const a = Math.PI / 4 + i * Math.PI / 2, px = Math.cos(a) * 3.4, pz = Math.sin(a) * 3.4;
-      add(iBeam(0.26, 0.28, 5.2), M.gantry, px, 0, pz, { ry: -a + Math.PI / 2 });
-      add(new THREE.BoxGeometry(0.5, 0.03, 0.5), M.steel, px, 0.015, pz, { ry: -a, cast: false });
-      // a beam from the column to the ring, and a header beam to the next column
-      const bx = Math.cos(a) * (ARM_R + 3.4) / 2, bz = Math.sin(a) * (ARM_R + 3.4) / 2;
-      add(iBeam(0.16, 0.2, 3.4 - ARM_R + 0.1).rotateZ(Math.PI / 2).translate((3.4 - ARM_R + 0.1) / 2, 0, 0), M.gantry, bx, MOUNT_Y + 0.02, bz, { ry: -a });
-      const a2 = a + Math.PI / 2, qx = Math.cos(a2) * 3.4, qz = Math.sin(a2) * 3.4;
-      const hl = Math.hypot(qx - px, qz - pz);
-      const hb = add(iBeam(0.2, 0.26, hl).rotateZ(Math.PI / 2).translate(hl / 2, 0, 0), M.gantry, (px + qx) / 2, 5.07, (pz + qz) / 2);
-      hb.rotation.y = -Math.atan2(qz - pz, qx - px);
-      // a work light on the column: a housing and its diffuser, facing in
-      add(new THREE.BoxGeometry(0.09, 0.95, 0.07), M.dark, px - Math.cos(a) * 0.19, 2.3, pz - Math.sin(a) * 0.19, { ry: -a, cast: false });
-      pill.push(new THREE.BoxGeometry(0.035, 0.85, 0.02).rotateY(-a).translate(px - Math.cos(a) * 0.23, 2.3, pz - Math.sin(a) * 0.23));
-    }
-    const strips = new THREE.Mesh(mergeAll(pill), M.strip);
-    s.add(strips);
-    // compact downlights under the ring
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU + Math.PI / 8;
-      add(new THREE.CylinderGeometry(0.07, 0.08, 0.08, 16), M.dark, Math.cos(a) * (ARM_R - 0.02), MOUNT_Y - 0.17, Math.sin(a) * (ARM_R - 0.02), { cast: false });
-      add(new THREE.CircleGeometry(0.06, 16).rotateX(Math.PI / 2), M.lamp, Math.cos(a) * (ARM_R - 0.02), MOUNT_Y - 0.212, Math.sin(a) * (ARM_R - 0.02), { cast: false });
-    }
-
     // the standing frame the armor is built on: a post, a shoulder yoke and ankle clamps
     this.frame = new THREE.Group();
     const fr = (geo, mat, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = !low; m.receiveShadow = true; this.frame.add(m); return m; };
@@ -396,118 +383,159 @@ export class SuitUp extends Chapter {
   }
 
   /**
-   * Four industrial robot arms hanging from the gantry: a carriage riding the ring on rollers, a telescoping
-   * mast, a turntable, motor hubs at the shoulder and elbow, tapered lacquered links with amber service
-   * covers, hydraulic rams with chrome rods, cable runs and LED strips, a wrist roll unit and a gripper.
-   * (Same joints as before: mount, yaw, shoulder (sh), elbow (el), tool, driven by _ik.)
+   * The assembly cell: four floor-mounted six-axis industrial robots (a bolted pedestal, a slewing carousel
+   * with its motor, a shoulder and an elbow with cast, tapered links in safety orange, a counterbalance, a
+   * cable run, a wrist and a two-finger gripper), and a steel parts rack beside each, within its reach.
+   * Joints: yaw (carousel), sh (shoulder), el (elbow), tool (wrist, kept pointing at the work), driven by _ik.
    */
   _buildArms() {
     const low = this.app.low;
-    // real industrial-robot finishes: a graphite and an amber 2K paint (satin clear coat, worn roughness),
-    // black anodised joints, hard-chromed rods, rubber, and small unlit indicator lenses
     const M = {
-      shell: this._paint(0x2e3236, { roughness: 0.42, clearcoat: 0.5, normalScale: 0.05 }),
-      cover: this._paint(0xd0801a, { roughness: 0.4, clearcoat: 0.55, normalScale: 0.05 }),
-      joint: new THREE.MeshStandardMaterial({ color: 0x1a1c1f, metalness: 0.7, roughness: 0.45, roughnessMap: this._grit.rough }),
-      chrome: new THREE.MeshStandardMaterial({ color: 0xd8dde3, metalness: 1, roughness: 0.14 }),
-      rubber: new THREE.MeshStandardMaterial({ color: 0x121315, metalness: 0, roughness: 0.85 }),
-      led: new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.15, emissive: 0xbfd2e6, emissiveIntensity: 0.18 }),
+      body: this._paint(0xc25a14, { roughness: 0.5, clearcoat: 0.22, normalScale: 0.1 }),   // robot orange, a working machine's
+      dark: this._paint(0x212428, { roughness: 0.5, normalScale: 0.05 }),
+      joint: new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.7, roughness: 0.45, roughnessMap: this._grit.rough }),
+      steel: new THREE.MeshStandardMaterial({ color: 0xb4bac1, metalness: 1, roughness: 0.32, roughnessMap: this._grit.rough }),
+      rubber: new THREE.MeshStandardMaterial({ color: 0x101113, metalness: 0, roughness: 0.85 }),
     };
-    // the fitting tip: a dull nozzle at rest, white-hot while it works
-    this.tipMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a322c), toneMapped: false });
-    this.tipBase = new THREE.Color(0x3a322c);
-    this.tipHot = new THREE.Color(0xffe0a0).multiplyScalar(6);
+    // a small status lamp on each wrist: dull at rest, hot while the tool works
+    this.tipMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x2a2d30), toneMapped: false });
+    this.tipBase = new THREE.Color(0x2a2d30);
+    this.tipHot = new THREE.Color(0xffe2b0).multiplyScalar(4);
     const rbox = (w, hh, d, r) => new RoundedBoxGeometry(w, hh, d, 3, Math.min(r, w / 2.2, hh / 2.2, d / 2.2));
     const mesh = (geo, mat, parent, x = 0, y = 0, z = 0, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast && !low; m.receiveShadow = true; parent.add(m); return m; };
-    // a link: an oval shell turned from a profile, running down -y from its joint
-    const link = (len, r0, r1) => {
-      const pts = [[0.001, 0], [r0 * 0.8, -0.01], [r0, -0.06], [(r0 + r1) / 2 * 1.04, -len * 0.5], [r1, -len + 0.06], [r1 * 0.8, -len + 0.01], [0.001, -len]].map(([r, y]) => new THREE.Vector2(r, y)).reverse();
-      const g = new THREE.LatheGeometry(pts, 28);
-      g.scale(1, 1, 1.35); // deeper than wide, like a cast arm
+    // a cast link running up +y from its joint: a rounded box tapering from (w0, d0) to (w1, d1)
+    const link = (len, w0, d0, w1, d1) => {
+      const g = new RoundedBoxGeometry(1, len, 1, 4, 0.12);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const t = p.getY(i) / len + 0.5;
+        p.setXYZ(i, p.getX(i) * (w0 + (w1 - w0) * t), p.getY(i) + len / 2, p.getZ(i) * (d0 + (d1 - d0) * t));
+      }
       g.computeVertexNormals();
       return g;
     };
-    // a motor hub across the joint (along x): body, amber end caps, a ring of bolts
+    // a motor hub across a joint (along x): the body, orange end caps, a ring of bolts
     const hub = (parent, r, w) => {
       mesh(new THREE.CylinderGeometry(r, r, w, 32).rotateZ(Math.PI / 2), M.joint, parent);
       for (const sx of [-1, 1]) {
-        mesh(new THREE.CylinderGeometry(r * 0.78, r * 0.82, 0.03, 32).rotateZ(Math.PI / 2), M.cover, parent, sx * (w / 2 + 0.012), 0, 0);
+        mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.84, 0.035, 32).rotateZ(Math.PI / 2), M.body, parent, sx * (w / 2 + 0.014), 0, 0);
         const bolts = [];
         for (let k = 0; k < 8; k++) {
           const a = (k / 8) * TAU;
-          const b = new THREE.CylinderGeometry(0.008, 0.008, 0.012, 6).rotateZ(Math.PI / 2);
-          b.translate(sx * (w / 2 + 0.03), Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55);
-          bolts.push(b);
+          bolts.push(new THREE.CylinderGeometry(0.01, 0.01, 0.014, 6).rotateZ(Math.PI / 2).translate(sx * (w / 2 + 0.036), Math.cos(a) * r * 0.56, Math.sin(a) * r * 0.56));
         }
-        mesh(mergeGeometries(bolts), M.chrome, parent, 0, 0, 0, false);
+        mesh(mergeGeometries(bolts), M.steel, parent, 0, 0, 0, false);
       }
     };
-    // a hydraulic ram between two points in a group's space: sleeve, chrome rod, clevis ends
-    const ram = (parent, from, to, r = 0.022) => {
-      const d = to.clone().sub(from), len = d.length();
-      const g = new THREE.Group(); g.position.copy(from); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); parent.add(g);
-      mesh(new THREE.CylinderGeometry(r, r, len * 0.55, 14).translate(0, len * 0.275, 0), M.joint, g);
-      mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, len * 0.5, 12).translate(0, len * 0.72, 0), M.chrome, g);
-      mesh(rbox(r * 2.6, r * 2.2, r * 2.6, 0.006), M.joint, g, 0, 0, 0, false);
-      mesh(rbox(r * 2.2, r * 2, r * 2.2, 0.006), M.joint, g, 0, len, 0, false);
-    };
-    // a cable along a link (a tube through a few points)
-    const cable = (parent, pts) => mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.011, 6, false), M.rubber, parent, 0, 0, 0, false);
+    const cable = (parent, pts, r = 0.016) => mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, r, 6, false), M.rubber, parent, 0, 0, 0, false);
 
-    this.arms = ARM_ANGLES.map((a, k) => {
+    this.arms = ROBOT_ANGLES.map((a, k) => {
       const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-      const mount = new THREE.Group();
-      mount.position.set(out.x * ARM_R, MOUNT_Y, out.z * ARM_R);
-      this.scene.add(mount);
-      // the carriage on the ring: a housing, rollers, a status LED (turned to run along the ring)
-      const carriage = new THREE.Group(); carriage.rotation.y = -a + Math.PI / 2; mount.add(carriage);
-      mesh(rbox(0.46, 0.16, 0.26, 0.03), M.shell, carriage, 0, 0.02, 0);
-      mesh(rbox(0.3, 0.05, 0.27, 0.015), M.cover, carriage, 0, 0.11, 0);
-      for (const sx of [-0.15, 0.15]) for (const sz of [-0.14, 0.14]) mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.04, 16).rotateX(Math.PI / 2), M.rubber, carriage, sx, 0.1, sz, false);
-      mesh(new THREE.BoxGeometry(0.2, 0.015, 0.01), M.led, carriage, 0, 0.02, 0.131, false);
-      // the telescoping mast
-      mesh(rbox(0.13, MAST * 0.62, 0.13, 0.02), M.shell, mount, 0, -MAST * 0.31, 0);
-      mesh(new THREE.CylinderGeometry(0.045, 0.045, MAST * 0.5, 16), M.chrome, mount, 0, -MAST * 0.72, 0);
-      // the turntable
-      const yaw = new THREE.Group(); yaw.position.y = -MAST; mount.add(yaw);
-      mesh(new THREE.CylinderGeometry(0.14, 0.15, 0.07, 32), M.joint, yaw, 0, 0.02, 0);
-      mesh(new THREE.TorusGeometry(0.145, 0.008, 6, 40).rotateX(Math.PI / 2), M.led, yaw, 0, 0.02, 0, false);
-      mesh(rbox(0.24, 0.14, 0.2, 0.03), M.shell, yaw, 0, -0.06, 0);
-      mesh(rbox(0.1, 0.12, 0.16, 0.02), M.cover, yaw, 0.14, -0.06, 0); // the yaw motor on the side
-      // the shoulder: the big hub, the upper link, its ram, a cable, a cover panel, an LED strip
-      const sh = new THREE.Group(); sh.position.y = -0.12; yaw.add(sh);
-      hub(sh, 0.1, 0.24);
-      mesh(link(L1, 0.085, 0.065), M.shell, sh);
-      mesh(rbox(0.012, L1 * 0.5, 0.1, 0.005), M.cover, sh, 0.085, -L1 * 0.42, 0);
-      mesh(new THREE.BoxGeometry(0.01, L1 * 0.36, 0.012), M.led, sh, -0.086, -L1 * 0.42, 0.03, false);
-      ram(sh, new THREE.Vector3(0, -0.12, 0.13), new THREE.Vector3(0, -L1 * 0.62, 0.1));
-      cable(sh, [new THREE.Vector3(-0.1, 0.04, -0.06), new THREE.Vector3(-0.12, -L1 * 0.3, -0.1), new THREE.Vector3(-0.1, -L1 * 0.7, -0.09), new THREE.Vector3(-0.08, -L1 + 0.05, -0.05)]);
-      // the elbow and forearm
-      const el = new THREE.Group(); el.position.y = -L1; sh.add(el);
-      hub(el, 0.075, 0.2);
-      mesh(link(L2, 0.062, 0.048), M.shell, el);
-      mesh(rbox(0.1, 0.16, 0.12, 0.02), M.cover, el, 0, -L2 * 0.2, 0);
-      mesh(new THREE.BoxGeometry(0.01, L2 * 0.4, 0.012), M.led, el, 0.066, -L2 * 0.55, 0.02, false);
-      cable(el, [new THREE.Vector3(-0.08, 0.03, -0.05), new THREE.Vector3(-0.07, -L2 * 0.4, -0.07), new THREE.Vector3(-0.05, -L2 + 0.08, -0.04)]);
-      // the wrist and tool: a roll unit, a flange with a glowing ring, a two-finger gripper, the work tip
-      const tool = new THREE.Group(); tool.position.y = -L2; el.add(tool);
-      mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.07, 24), M.joint, tool, 0, -0.03, 0);
-      mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.02, 28), M.cover, tool, 0, -0.075, 0);
-      mesh(new THREE.TorusGeometry(0.05, 0.006, 6, 32).rotateX(Math.PI / 2), this.tipMat, tool, 0, -0.088, 0, false);
-      mesh(new THREE.SphereGeometry(0.018, 10, 8), this.tipMat, tool, 0, -0.17, 0, false);
+      const base = new THREE.Vector3(out.x * ROBOT_R, 0, out.z * ROBOT_R);
+      const root = new THREE.Group();
+      root.position.copy(base);
+      root.rotation.y = Math.atan2(-out.x, -out.z); // the pedestal squared to the platform
+      this.scene.add(root);
+      // the floor plate with its anchor bolts, and the pedestal
+      mesh(rbox(0.86, 0.03, 0.86, 0.01), M.steel, root, 0, 0.015, 0);
+      const anchors = [];
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) anchors.push(new THREE.CylinderGeometry(0.022, 0.022, 0.03, 6).translate(sx * 0.36, 0.045, sz * 0.36));
+      mesh(mergeGeometries(anchors), M.joint, root, 0, 0, 0, false);
+      mesh(new THREE.CylinderGeometry(0.3, 0.37, 0.42, 36), M.dark, root, 0, 0.24, 0);
+      // the carousel: a slew ring, the cast body, the slew motor behind, a cable column
+      const yaw = new THREE.Group(); yaw.position.y = 0.45; root.add(yaw);
+      mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.09, 40), M.joint, yaw, 0, 0.045, 0);
+      mesh(rbox(0.5, 0.4, 0.58, 0.07), M.body, yaw, 0, 0.3, -0.05);
+      mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.32, 20).rotateX(Math.PI / 2), M.dark, yaw, 0, 0.3, -0.48);
+      mesh(rbox(0.2, 0.16, 0.14, 0.02), M.dark, yaw, 0, 0.3, -0.66, false);
+      // the shoulder and the lower arm, with its counterbalance cylinder
+      const sh = new THREE.Group(); sh.position.set(0, SHOULDER_Y - 0.45, 0); yaw.add(sh);
+      hub(sh, 0.17, 0.6);
+      mesh(link(L1, 0.2, 0.3, 0.17, 0.22), M.body, sh);
+      mesh(new THREE.CylinderGeometry(0.065, 0.065, L1 * 0.5, 16).translate(0, L1 * 0.25, 0), M.dark, sh, 0.2, 0, -0.12);
+      mesh(new THREE.CylinderGeometry(0.03, 0.03, L1 * 0.3, 12).translate(0, L1 * 0.62, 0), M.steel, sh, 0.2, 0, -0.12, false);
+      cable(sh, [new THREE.Vector3(-0.14, -0.1, -0.2), new THREE.Vector3(-0.16, L1 * 0.3, -0.2), new THREE.Vector3(-0.14, L1 * 0.75, -0.16), new THREE.Vector3(-0.12, L1, -0.12)]);
+      // the elbow, its motors, the tapered forearm
+      const el = new THREE.Group(); el.position.y = L1; sh.add(el);
+      hub(el, 0.13, 0.44);
+      mesh(rbox(0.24, 0.3, 0.26, 0.04), M.body, el, 0, -0.02, -0.2);
+      mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 16).rotateX(Math.PI / 2), M.dark, el, 0.06, 0, -0.42);
+      mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 16).rotateX(Math.PI / 2), M.dark, el, -0.06, 0, -0.42);
+      mesh(link(L2, 0.17, 0.2, 0.11, 0.12), M.body, el);
+      cable(el, [new THREE.Vector3(-0.1, 0, -0.22), new THREE.Vector3(-0.12, L2 * 0.35, -0.12), new THREE.Vector3(-0.09, L2 * 0.8, -0.08), new THREE.Vector3(-0.06, L2 + 0.04, -0.05)], 0.013);
+      // the wrist and the gripper: a roll unit, a steel flange, the jaw body and two sliding fingers with pads
+      const tool = new THREE.Group(); tool.position.y = L2; el.add(tool);
+      mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.13, 24).translate(0, 0.065, 0), M.joint, tool);
+      mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 28), M.steel, tool, 0, 0.14, 0);
+      mesh(rbox(0.3, 0.07, 0.13, 0.015), M.dark, tool, 0, 0.19, 0);
+      mesh(new THREE.BoxGeometry(0.05, 0.012, 0.01), this.tipMat, tool, 0, 0.19, 0.068, false);
       const claws = [-1, 1].map((sx) => {
-        const g = new THREE.Group(); g.position.set(sx * 0.035, -0.09, 0); tool.add(g);
-        mesh(rbox(0.018, 0.1, 0.045, 0.006).translate(0, -0.05, 0), M.shell, g);
-        mesh(rbox(0.022, 0.03, 0.05, 0.006).translate(-sx * 0.004, -0.105, 0), M.rubber, g, 0, 0, 0, false);
+        const g = new THREE.Group(); g.position.set(sx * 0.1, 0.22, 0); g.userData.s = sx; tool.add(g);
+        mesh(rbox(0.03, TOOL - 0.2, 0.09, 0.006).translate(0, (TOOL - 0.2) / 2, 0), M.steel, g);
+        mesh(rbox(0.012, 0.06, 0.08, 0.004).translate(-sx * 0.02, TOOL - 0.235, 0), M.rubber, g, 0, 0, 0, false);
         return g;
       });
       // fewer draw calls: what shares a material and moves together is merged
-      for (const grp of [carriage, mount, yaw, sh, el, tool]) mergeStatic(grp, grp.children.filter((c) => c.isMesh && c.material !== this.tipMat));
-      mount.updateMatrixWorld(true);
-      const base = sh.getWorldPosition(new THREE.Vector3());
-      const rest = base.clone().addScaledVector(out, -0.3).add(new THREE.Vector3(0, -1.2, 0));
-      return { k, out, mount, yaw, sh, el, tool, claws, base, rest, cur: rest.clone(), target: rest.clone(), active: 0, phase: k * 1.3 };
+      for (const grp of [root, yaw, sh, el, tool]) mergeStatic(grp, grp.children.filter((c) => c.isMesh && c.material !== this.tipMat));
+      // at rest: folded up over its own base, the gripper looking at the suit
+      const rest = base.clone().addScaledVector(out, -0.8).add(new THREE.Vector3(0, 1.72, 0));
+      return { k, out, base, root, yaw, sh, el, tool, claws, rest, cur: rest.clone(), target: rest.clone(), active: 0, holding: false, phase: k * 1.3 };
     });
+
+    // the parts racks: two steel decks on yellow uprights, each turned to face its robot
+    const yellow = [], decks = [];
+    const T = new THREE.Object3D();
+    this.arms.forEach((arm, k) => {
+      const a = RACK_ANGLES[k];
+      const pos = new THREE.Vector3(Math.cos(a) * RACK_R, 0, Math.sin(a) * RACK_R);
+      const yawR = Math.atan2(arm.base.x - pos.x, arm.base.z - pos.z);
+      arm.rack = { pos, yaw: yawR };
+      T.position.copy(pos); T.rotation.set(0, yawR, 0); T.updateMatrix();
+      const put = (list, g) => list.push(g.applyMatrix4(T.matrix));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(yellow, new THREE.BoxGeometry(0.06, 1.78, 0.06).translate(sx * 1.02, 0.89, sz * 0.3));
+      for (const sx of [-1, 1]) put(yellow, new THREE.BoxGeometry(0.04, 0.04, 0.6).translate(sx * 1.02, 1.74, 0));
+      put(yellow, new THREE.BoxGeometry(2.1, 0.04, 0.04).translate(0, 1.74, -0.3));
+      put(yellow, new THREE.BoxGeometry(2.3, 0.03, 0.03).rotateZ(0.62).translate(0, 0.9, -0.31));
+      for (const y of SHELVES) {
+        put(decks, new THREE.BoxGeometry(2.1, 0.035, 0.66).translate(0, y - 0.018, 0));
+        put(yellow, new THREE.BoxGeometry(2.1, 0.07, 0.03).translate(0, y - 0.05, 0.32));
+      }
+    });
+    for (const [geos, mat] of [[yellow, this.M.yellow], [decks, this.M.steel]]) {
+      const m = new THREE.Mesh(mergeAll(geos), mat);
+      m.castShadow = !low; m.receiveShadow = true;
+      this.scene.add(m);
+    }
+  }
+
+  /**
+   * Puts an armor's sections on the racks (each on the rack of the robot that fits it) and gives each its
+   * slot in the build and its way in: the robot's own arc, the part swung round its base from the rack to
+   * just outside its place.
+   */
+  _stageSections(suit) {
+    const count = [0, 0, 0, 0];
+    const tmp = new THREE.Vector3();
+    for (const sec of suit.sections) {
+      const plan = PLAN[sec.name];
+      if (!plan) continue;
+      const arm = this.arms[plan[0]], R = arm.rack;
+      sec.robot = arm; sec.start = plan[1]; sec.span = SLOT;
+      const slot = count[plan[0]]++;
+      const lx = ((slot % 3) - 1) * 0.66;
+      const size = tmp.subVectors(sec.max, sec.min);
+      // (in the suit's own space: its root stands on the platform, unturned)
+      sec.rack = new THREE.Vector3(R.pos.x + Math.cos(R.yaw) * lx, SHELVES[Math.min(1, Math.floor(slot / 3))] + size.y / 2 + 0.004 - PLATFORM_Y, R.pos.z - Math.sin(R.yaw) * lx);
+      sec.grip = clamp(Math.min(size.x, size.z) * 0.5, 0.05, 0.2);
+      const b = arm.base, out = new THREE.Vector3();
+      sec.carryPath = (e, from, to) => {
+        const a0 = Math.atan2(from.x - b.x, from.z - b.z), a1 = Math.atan2(to.x - b.x, to.z - b.z);
+        const da = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+        const r0 = Math.hypot(from.x - b.x, from.z - b.z), r1 = Math.hypot(to.x - b.x, to.z - b.z);
+        const az = a0 + da * e, r = (r0 + (r1 - r0) * e) * (1 - 0.12 * Math.sin(e * Math.PI));
+        return out.set(b.x + Math.sin(az) * r, from.y + (to.y - from.y) * e + Math.sin(e * Math.PI) * 0.22, b.z + Math.cos(az) * r);
+      };
+    }
   }
 
   _buildSuits() {
@@ -557,15 +585,16 @@ export class SuitUp extends Chapter {
     const spec = SPEC[key];
     let suit;
     if (spec.mode === 'plates') {
-      // every plate separate, so they can fly on one by one
+      // every plate separate; for an assembly-line build, grouped into the sections the arms fit
       suit = new RealSuit(key, { pieces: true, castShadow: !low });
+      if (suit.ok && spec.sections) { suit.buildSections(spec.sections); this._stageSections(suit); }
       if (!suit.ok) {
         // silent fallback when the model file is missing: the procedural armor has the same assembly API
         suit = new Suit({ scheme: 'mk3', castShadow: !low });
         suit.ok = true;
         suit.height = 1.9;
       }
-      suit.setHologram(true); // makes its hologram material now (the waiting look)
+      if (!suit.sections) suit.setHologram(true); // makes its hologram material now (the waiting look)
     } else {
       suit = new RealSuit(key, { uniqueMaterials: true, castShadow: !low });
       if (!suit.ok) return null;
@@ -641,7 +670,7 @@ export class SuitUp extends Chapter {
       kicker: 'Assembly bay',
       title: 'Suit <em>Up</em>',
       jp: 'ASSEMBLY',
-      desc: 'Six armors, from the cave-built Mark I to the Hulkbuster. The gantry arms fit the Mark III plate by plate, weld the plated suits on from the boots up, and watch the nanotech suits flow out of their reactors. J.A.R.V.I.S. checks every system in.',
+      desc: 'Nine armors, from the cave-built Mark I to the Hulkbuster. Like a car on an assembly line, four robots lift each section off its rack and fit it home, boots first and faceplate last; the Mark XLII and the Hulkbuster are welded on, the nanotech suits flow out of their reactors. J.A.R.V.I.S. checks every system in.',
       extra: [this.gestures([['hold', '<b>Hold</b> anywhere to suit up'], ['drag', '<b>Drag</b> to orbit the platform'], ['tap', '<b>Pick</b> an armor below (or keys 1–6)']])],
     });
 
@@ -724,7 +753,14 @@ export class SuitUp extends Chapter {
 
   /** The waiting look: the whole armor as a faint hologram on the frame. */
   _setGhost() {
-    if (this.spec.mode === 'plates') {
+    if (this.spec.mode === 'plates' && this.suit.sections) {
+      // the real parts, waiting on the racks
+      const s = this.suit;
+      s.setHologram(false);
+      this._shadows(s, true);
+      s.assemble(0);
+      s.reactor = 0; s.eyes = 0; s.thrust = 0;
+    } else if (this.spec.mode === 'plates') {
       const s = this.suit;
       s.assemble(1);
       s.setHologram(true);
@@ -819,11 +855,11 @@ export class SuitUp extends Chapter {
     // push-in, the boots up close as the first plates land, a side crane up the legs and torso, wide on the
     // arms, round to the chest, the helmet close as the eyes light, then low as it lifts off and a pull back.
     this.cine.play([
-      { t: 0.8, pos: P(2.6, 0.55, 3.4), look: L(0, 0.6, 0), fov: 34 },
-      { t: T * 0.28, pos: P(1.05, 0.32, 1.45), look: L(0, 0.35, 0), fov: 34 },
-      { t: T * 0.5, pos: P(-1.35, 0.95, 1.45), look: L(0, 0.95, 0), fov: 36 },
-      { t: T * 0.72, pos: P(-1.6, 1.25, 2.9), look: L(-0.45, 1.5, 0), fov: 40 },
-      { t: T * 0.9, pos: P(1.25, 1.8, 1.55), look: L(0, 1.55, 0), fov: 36 },
+      { t: 0.8, pos: P(1.2, 1.0, 4.6), look: L(0, 0.8, 0), fov: 38 },
+      { t: T * 0.28, pos: P(-1.0, 0.8, 4.0), look: L(0, 0.55, 0), fov: 36 },
+      { t: T * 0.52, pos: P(1.0, 1.25, 4.1), look: L(0, 1.05, 0), fov: 36 },
+      { t: T * 0.76, pos: P(-0.9, 1.55, 3.8), look: L(0, 1.4, 0), fov: 36 },
+      { t: T * 0.97, pos: P(0.9, 1.75, 3.1), look: L(0, 1.6, 0), fov: 34 },
       { t: T + 0.5, pos: P(0.3, 1.92, 1.05), look: L(0, 1.84, 0), fov: 28 },
       { t: T + 1.9, pos: P(0.22, 1.9, 1.18), look: L(0, 1.83, 0), fov: 28 },
       { t: T + 2.6, pos: P(0.6, 0.35, 2.4), look: L(0, 1.6, 0), fov: 46 },
@@ -853,7 +889,7 @@ export class SuitUp extends Chapter {
     let best = null, bd = 0;
     for (const a of this.arms) { const d = a.out.dot(this._v2); if (d > bd && a.active < 0.2) { bd = d; best = a; } }
     if (!best) best = this.arms.reduce((m, a) => (a.out.dot(this._v2) > m.out.dot(this._v2) ? a : m));
-    best.target.copy(pos).addScaledVector(this._v2, 0.34);
+    best.target.copy(pos).addScaledVector(this._v2, 0.1);
     best.target.y += 0.08;
     if (best.active <= 0 && now - this._lastServo > 0.25) { this._lastServo = now; this.app.sfx.servo(0.3); }
     best.active = 0.5;
@@ -978,24 +1014,63 @@ export class SuitUp extends Chapter {
 
   /* ---------------- frame ---------------- */
 
+  /** A robot's joints for its tool tip at T: turn to it, reach with the two links, keep the tool level. */
   _ik(arm, T) {
-    const B = arm.base;
-    const dx = T.x - B.x, dy = T.y - B.y, dz = T.z - B.z;
-    arm.yaw.rotation.y = Math.atan2(-dx, -dz);
-    const hz = Math.hypot(dx, dz);
-    const D = clamp(Math.hypot(hz, dy), 0.25, L1 + L2 - 0.02);
-    const alpha = Math.atan2(hz, -dy);
-    const a1 = Math.acos(clamp((L1 * L1 + D * D - L2 * L2) / (2 * L1 * D), -1, 1));
-    const a2 = Math.acos(clamp((L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2), -1, 1));
-    arm.sh.rotation.x = alpha + a1;
-    arm.el.rotation.x = -(Math.PI - a2);
-    // keep the fitting head pointing at the work
-    arm.tool.rotation.x = -(alpha + a1 - (Math.PI - a2)) + alpha * 0.9;
+    const dx = T.x - arm.base.x, dz = T.z - arm.base.z;
+    arm.yaw.rotation.y = Math.atan2(dx, dz) - arm.root.rotation.y;
+    const r = Math.max(0.3, Math.hypot(dx, dz) - TOOL); // to the wrist (the tool points level at the work)
+    const y = T.y - SHOULDER_Y;
+    const d = clamp(Math.hypot(r, y), Math.abs(L1 - L2) + 0.08, L1 + L2 - 0.02);
+    const a = Math.atan2(r, y);
+    const b = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+    const c = Math.acos(clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -1, 1));
+    const t1 = a - b, t2 = Math.PI - c;
+    arm.sh.rotation.x = t1;
+    arm.el.rotation.x = t2;
+    arm.tool.rotation.x = Math.PI / 2 - t1 - t2;
+  }
+
+  /**
+   * The assembly line: each robot takes its sections from its rack in turn, swings each round to the suit,
+   * pushes it home and fastens it (a few sparks, then a clank as it seats); taking the suit off runs the
+   * same backwards, the parts going back to their racks.
+   */
+  _stepSections(dir) {
+    const suit = this.suit;
+    const landed = suit.assemble(this.t);
+    const low = this.app.low;
+    for (const sec of suit.sections) {
+      const arm = sec.robot;
+      const p = sec.group.getWorldPosition(this._v1);
+      if (arm && sec.k > 0 && sec.k < 0.93) {
+        // the gripper on the part's side nearest the robot
+        const dx = arm.base.x - p.x, dz = arm.base.z - p.z, l = Math.hypot(dx, dz) || 1;
+        arm.target.set(p.x + (dx / l) * sec.grip, p.y, p.z + (dz / l) * sec.grip);
+        arm.active = Math.max(arm.active, 0.3);
+        if (sec.phase === 'carry' || sec.phase === 'fit') arm.holding = true;
+        if (sec.phase === 'fit' && dir > 0 && Math.random() < this._dt * 12) {
+          this.sparks.emit({ x: p.x, y: p.y + rand(-0.08, 0.08), z: p.z, vx: rand(-1, 1), vy: rand(0.2, 1.2), vz: rand(-1, 1), life: rand(0.15, 0.4), size: rand(0.006, 0.014), color: this.sparkColors[0] });
+        }
+      }
+      const now = sec.k <= 0 ? 'none' : sec.phase, was = sec._was || 'none';
+      if (dir > 0 && now === 'seated' && was !== 'seated') {
+        this.sparks.burst(p, low ? 6 : 12, { speed: 2, spread: 0.3, up: 0.7, life: [0.15, 0.45], size: [0.006, 0.016], colors: this.sparkColors });
+        if (this.clock - this._lastClank > 0.08) { this._lastClank = this.clock; this.app.sfx.clank(); }
+        if (this.cine.active) this.cine.shake = Math.max(this.cine.shake, 0.012); else this.shake = Math.max(this.shake, 0.012);
+      } else if (now === 'carry' && was !== 'carry' && was !== 'fit' && this.clock - this._lastServo > 0.2) {
+        this._lastServo = this.clock; this.app.sfx.servo(0.25);
+      } else if (dir < 0 && now !== 'seated' && was === 'seated' && this.clock - this._lastClank > 0.12) {
+        this._lastClank = this.clock; this.app.sfx.servo(0.15);
+      }
+      sec._was = now;
+    }
+    this.landed = landed;
   }
 
   /** Advances the plate assembly, or the weld / nanite reveal (clip planes), to this.t. */
   _stepSequence(dir) {
     const spec = this.spec;
+    if (spec.mode === 'plates' && this.suit.sections) { this._stepSections(dir); return; }
     if (spec.mode === 'plates') {
       const suit = this.suit;
       const landed = suit.ok ? suit.assemble(this.t) : Math.floor(this.t * 60) - 1;
@@ -1064,7 +1139,8 @@ export class SuitUp extends Chapter {
     // the sequence
     if (this.state === 'assembling' || this.state === 'removing') {
       const dir = this.state === 'assembling' ? 1 : -1;
-      this.t = clamp(this.t + dir * dt / (dir > 0 ? this.duration : REMOVE_TIME), 0, 1);
+      for (const a of this.arms) a.holding = false;
+      this.t = clamp(this.t + dir * dt / (dir > 0 ? this.duration : suit.sections ? 6 : REMOVE_TIME), 0, 1);
       this._stepSequence(dir);
       const pct = Math.round(this.t * 100);
       if (pct !== this._plate) { this._plate = pct; this.plateFill.style.width = `${pct}%`; this.plateText.textContent = `${pct}%`; }
@@ -1087,28 +1163,26 @@ export class SuitUp extends Chapter {
     const frameBack = this.state === 'done' ? -0.25 : 0;
     this.frame.position.z = damp(this.frame.position.z, frameBack, 2, dt);
 
-    // arms: reach while fitting, otherwise fold back and sway
+    // robots: at the work while there is some, otherwise folded over their bases, barely moving
+    if (this.state !== 'assembling' && this.state !== 'removing') for (const a of this.arms) a.holding = false;
     for (const a of this.arms) {
       a.active = Math.max(0, a.active - dt);
       const working = a.active > 0;
       if (!working) {
-        const busy = this.state === 'assembling' ? 0.35 : 0;
         a.target.copy(a.rest);
-        a.target.x += Math.sin(t * 0.7 + a.phase) * 0.06 - a.out.x * busy;
-        a.target.z += Math.cos(t * 0.6 + a.phase) * 0.06 - a.out.z * busy;
-        a.target.y += Math.sin(t * 0.9 + a.phase) * 0.05 - busy * 0.4;
+        a.target.y += Math.sin(t * 0.5 + a.phase) * 0.02;
       }
-      a.cur.lerp(a.target, 1 - Math.exp(-(working ? 9 : 2.5) * dt));
+      if (a.holding) a.cur.copy(a.target); else a.cur.lerp(a.target, 1 - Math.exp(-(working ? 7 : 2.2) * dt));
       this._ik(a, a.cur);
-      const open = working ? 0.1 : 0.35;
-      for (const c of a.claws) c.rotation.z = damp(c.rotation.z, (c.position.x > 0 ? 1 : -1) * open, 8, dt);
-      if (working && Math.random() < dt * 25) {
-        a.tool.getWorldPosition(this._v3);
-        this._v3.y -= 0.14;
-        this.sparks.emit({ x: this._v3.x, y: this._v3.y, z: this._v3.z, vx: rand(-1.5, 1.5), vy: rand(0, 1.5), vz: rand(-1.5, 1.5), life: rand(0.2, 0.5), size: rand(0.012, 0.03), color: this.sparkColors[0] });
+      const gap = a.holding ? 0.05 : 0.1;
+      for (const c of a.claws) c.position.x = damp(c.position.x, c.userData.s * gap, 12, dt);
+      // (welding only: a carried part throws no sparks)
+      if (working && !suit.sections && Math.random() < dt * 22) {
+        a.tool.localToWorld(this._v3.set(0, TOOL, 0));
+        this.sparks.emit({ x: this._v3.x, y: this._v3.y, z: this._v3.z, vx: rand(-1.2, 1.2), vy: rand(0, 1.3), vz: rand(-1.2, 1.2), life: rand(0.15, 0.4), size: rand(0.006, 0.016), color: this.sparkColors[0] });
       }
     }
-    const anyWork = this.arms.some((a) => a.active > 0);
+    const anyWork = !suit.sections && this.arms.some((a) => a.active > 0);
     this.tipMat.color.copy(this.tipBase).lerp(this.tipHot, anyWork ? 0.5 + Math.random() * 0.5 : 0);
 
     // suits and glows (the whole model rises on its jets at the end: nothing is posed)
@@ -1145,12 +1219,14 @@ export class SuitUp extends Chapter {
     if (!this.cine.update(dt)) {
       if (!app.pointer.down) {
         this.orbitV *= Math.exp(-2.5 * dt);
-        this.orbit.yaw += this.orbitV + (this.state === 'done' ? 0.05 : 0.08) * dt;
+        this.orbit.yaw += this.orbitV;
       }
+      this.orbit.yaw = clamp(this.orbit.yaw, -0.62, 0.62);
       const o = this.orbit, d = o.dist * this.fit * this.S;
       const g = app.gyro;
       const gx = g ? g.x * 0.2 : 0;
-      this._v1.set(Math.sin(o.yaw + gx) * Math.cos(o.pitch) * d, 1.15 * this.S + Math.sin(o.pitch) * d, Math.cos(o.yaw + gx) * Math.cos(o.pitch) * d);
+      const sway = Math.sin(t * 0.11) * 0.1;
+      this._v1.set(Math.sin(o.yaw + gx + sway) * Math.cos(o.pitch) * d, 1.15 * this.S + Math.sin(o.pitch) * d, Math.cos(o.yaw + gx + sway) * Math.cos(o.pitch) * d);
       const cam = this.camera;
       cam.position.lerp(this._v1, 1 - Math.exp(-4 * dt));
       this.shake *= Math.exp(-10 * dt);

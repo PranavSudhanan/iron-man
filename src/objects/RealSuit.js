@@ -270,8 +270,12 @@ function findLights(meshes, H, { hands = true } = {}) {
 
 /* ---------------- eyes that glow in their own shape ---------------- */
 
-// an eye light in a texture: bright near-white, or a saturated cyan (a grey steel faceplate is neither)
-const eyeLit = (R, G, B) => Math.min(R, G, B) > 0.85 || (B > 0.6 && G > 0.5 && B - R > 0.25);
+// an eye light in a texture: a bright, colourless white or light grey, or a saturated cyan (the gold or
+// red of the faceplate around it is neither; only the visor's front is searched)
+const eyeLit = (R, G, B) => {
+  const lo = Math.min(R, G, B), hi = Math.max(R, G, B);
+  return lo > 0.85 || (lo > 0.62 && hi - lo < 0.14) || (B > 0.6 && G > 0.5 && B - R > 0.25);
+};
 
 /**
  * The model's own eye surfaces: the triangles around the visor that carry an eye light (in the colour or
@@ -352,7 +356,8 @@ function eyeGlowMaterial(map, emis, color, loose = false, disc = null) {
         float m = 1.0;
         if (uUseMap > 0.5) {
           vec3 c = pow(texture2D(tMap, vUv).rgb, vec3(1.0 / 2.2)); // back to the texture's own (sRGB) values
-          float white = smoothstep(0.78, 0.9, min(c.r, min(c.g, c.b)));
+          float lo = min(c.r, min(c.g, c.b)), hi = max(c.r, max(c.g, c.b));
+          float white = max(smoothstep(0.8, 0.9, lo), smoothstep(0.58, 0.68, lo) * (1.0 - smoothstep(0.1, 0.17, hi - lo)));
           float cyan = smoothstep(0.5, 0.65, c.b) * smoothstep(0.4, 0.55, c.g) * smoothstep(0.18, 0.32, c.b - c.r);
           float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
           m = uEmis > 0.5 ? smoothstep(0.3, 0.6, lum) : max(white, cyan);
@@ -368,6 +373,9 @@ function eyeGlowMaterial(map, emis, color, loose = false, disc = null) {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
 }
+/** Assembly-line timing within a section's slot: the robot reaches for it until REACH; it is home from SEATED. */
+export const REACH = 0.22, SEATED = 0.84;
+const _sv1 = new THREE.Vector3(), _sv2 = new THREE.Vector3();
 const _eyeSets = new Map(); // model key -> eye surfaces (measured once per model)
 const _reactorSets = new Map(); // model key -> reactor surfaces
 
@@ -459,6 +467,7 @@ export class RealSuit {
     const cfg = this.cfg = MODELS[key];
     const gltf = _ready.get(key);
     this.key = key;
+    this._castShadow = castShadow;
     this.root = new THREE.Group();
     this.root.name = `real-${key}`;
     this.reactor = 1; this.eyes = 1; this.thrust = 0; this.faceOpen = 0;
@@ -693,6 +702,197 @@ export class RealSuit {
   }
 
   /** Plate-by-plate assembly, t 0..1: parts fly in from around the body, feet first. Returns the last landed index. */
+  /**
+   * Splits the armor into the sections an assembly line fits one at a time: boots, shins, thighs, the
+   * pelvis, the back and the chest, upper arms, forearms, gauntlets, the helmet and last the faceplate.
+   * Whole plates stay whole (each connected part goes to the section its centre is in); a part that runs
+   * across the body (one continuous skin) is cut by region instead. The sections replace the model's
+   * meshes (same materials), each a group placed at its centre. After this, assemble(t) carries them in.
+   * torsoHalf: half the torso's width (the arms start beyond it), in the suit's own units.
+   */
+  buildSections({ torsoHalf = 0.21 } = {}) {
+    const H = this.height;
+    this.root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+    const shY = H * 0.8;
+    // where every triangle goes
+    const NAMES = ['bootL', 'bootR', 'shinL', 'shinR', 'thighL', 'thighR', 'pelvis', 'back', 'chest', 'upperL', 'upperR', 'foreL', 'foreR', 'handL', 'handR', 'helmet', 'face'];
+    const armLen = { l: 0, r: 0 };
+    const sh = { l: new THREE.Vector3(torsoHalf, shY, 0), r: new THREE.Vector3(-torsoHalf, shY, 0) };
+    const isArm = (p) => Math.abs(p.x) > torsoHalf + 0.015 && p.y > H * 0.35;
+    const src = this.meshes.filter((m) => m.visible !== false).map((m) => {
+      const g = m.geometry, M = new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld);
+      const pos = g.attributes.position, P = new Float32Array(pos.count * 3), v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(M); P.set([v.x, v.y, v.z], i * 3); if (isArm(v)) { const s = v.x > 0 ? 'l' : 'r'; armLen[s] = Math.max(armLen[s], v.distanceTo(sh[s])); } }
+      return { m, g, M, P };
+    });
+    const classify = (x, y, z) => {
+      const p = new THREE.Vector3(x, y, z);
+      if (isArm(p)) {
+        const s = x > 0 ? 'l' : 'r', S = s === 'l' ? 'L' : 'R';
+        const f = p.distanceTo(sh[s]) / (armLen[s] || 1);
+        return NAMES.indexOf(f < 0.42 ? `upper${S}` : f < 0.78 ? `fore${S}` : `hand${S}`);
+      }
+      const S = x >= 0 ? 'L' : 'R';
+      if (y < H * 0.075) return NAMES.indexOf(`boot${S}`);
+      if (y < H * 0.27) return NAMES.indexOf(`shin${S}`);
+      if (y < H * 0.46) return NAMES.indexOf(`thigh${S}`);
+      if (y < H * 0.56) return NAMES.indexOf('pelvis');
+      if (y < H * 0.845) return NAMES.indexOf(z < 0 ? 'back' : 'chest');
+      return NAMES.indexOf(z > H * 0.02 ? 'face' : 'helmet');
+    };
+    // buckets per section and material: plain (non-indexed) triangle lists in the root's space
+    const buckets = new Map();
+    const nm = new THREE.Matrix3(), a = new THREE.Vector3();
+    for (const { m, g, M, P } of src) {
+      nm.getNormalMatrix(M);
+      const idx = g.index, count = idx ? idx.count : g.attributes.position.count;
+      const T = count / 3;
+      const vi = (t, k) => (idx ? idx.getX(t * 3 + k) : t * 3 + k);
+      // connected parts (by shared, welded positions)
+      const parent = new Int32Array(g.attributes.position.count).map((_, i) => i);
+      const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+      const weld = new Map();
+      for (let i = 0; i < parent.length; i++) {
+        const k = `${Math.round(P[i * 3] * 2e3)},${Math.round(P[i * 3 + 1] * 2e3)},${Math.round(P[i * 3 + 2] * 2e3)}`;
+        if (weld.has(k)) { const r1 = find(i), r2 = find(weld.get(k)); if (r1 !== r2) parent[r1] = r2; } else weld.set(k, i);
+      }
+      for (let t = 0; t < T; t++) { const r0 = find(vi(t, 0)); for (const k of [1, 2]) { const r1 = find(vi(t, k)); if (r1 !== r0) parent[r1] = r0; } }
+      const parts = new Map();
+      for (let t = 0; t < T; t++) {
+        const r = find(vi(t, 0));
+        const q = parts.get(r) || { tris: [], min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity], c: [0, 0, 0], n: 0 };
+        q.tris.push(t);
+        for (let k = 0; k < 3; k++) { const i = vi(t, k); for (let d = 0; d < 3; d++) { const x = P[i * 3 + d]; q.min[d] = Math.min(q.min[d], x); q.max[d] = Math.max(q.max[d], x); q.c[d] += x; } q.n++; }
+        parts.set(r, q);
+      }
+      const groups = g.groups.length ? g.groups : [{ start: 0, count, materialIndex: 0 }];
+      const matOf = (t) => { for (const gr of groups) if (t * 3 >= gr.start && t * 3 < gr.start + gr.count) return gr.materialIndex; return 0; };
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const q of parts.values()) {
+        const size = Math.max(q.max[0] - q.min[0], q.max[1] - q.min[1], q.max[2] - q.min[2]);
+        const whole = size < H * 0.22 ? classify(q.c[0] / q.n, q.c[1] / q.n, q.c[2] / q.n) : -1;
+        for (const t of q.tris) {
+          let sec = whole;
+          if (sec < 0) {
+            let cx = 0, cy = 0, cz = 0;
+            for (let k = 0; k < 3; k++) { const i = vi(t, k); cx += P[i * 3]; cy += P[i * 3 + 1]; cz += P[i * 3 + 2]; }
+            sec = classify(cx / 3, cy / 3, cz / 3);
+          }
+          const mat = mats[matOf(t)] || mats[0];
+          const key = `${sec}|${mat.uuid}`;
+          let b = buckets.get(key);
+          if (!b) { b = { sec, mat, pos: [], nor: [], uv: [], uv1: [], hasUv: !!g.attributes.uv, hasUv1: !!g.attributes.uv1 }; buckets.set(key, b); }
+          for (let k = 0; k < 3; k++) {
+            const i = vi(t, k);
+            b.pos.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]);
+            if (g.attributes.normal) { a.fromBufferAttribute(g.attributes.normal, i).applyMatrix3(nm).normalize(); b.nor.push(a.x, a.y, a.z); }
+            if (b.hasUv) b.uv.push(g.attributes.uv.getX(i), g.attributes.uv.getY(i));
+            if (b.hasUv1) b.uv1.push(g.attributes.uv1.getX(i), g.attributes.uv1.getY(i));
+          }
+        }
+      }
+      m.visible = false;
+    }
+    // one group per section, at its centre, with a mesh per material
+    const secs = NAMES.map((name, i) => ({ name, i, group: new THREE.Group(), meshes: [], min: new THREE.Vector3(Infinity, Infinity, Infinity), max: new THREE.Vector3(-Infinity, -Infinity, -Infinity) }));
+    for (const b of buckets.values()) {
+      const s = secs[b.sec];
+      for (let i = 0; i < b.pos.length; i += 3) { s.min.min(a.set(b.pos[i], b.pos[i + 1], b.pos[i + 2])); s.max.max(a); }
+    }
+    for (const s of secs) s.centre = s.min.clone().add(s.max).multiplyScalar(0.5);
+    for (const b of buckets.values()) {
+      const s = secs[b.sec], c = s.centre;
+      const pos = new Float32Array(b.pos.length);
+      for (let i = 0; i < b.pos.length; i += 3) { pos[i] = b.pos[i] - c.x; pos[i + 1] = b.pos[i + 1] - c.y; pos[i + 2] = b.pos[i + 2] - c.z; }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      if (b.nor.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3)); else geo.computeVertexNormals();
+      if (b.hasUv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      if (b.hasUv1) geo.setAttribute('uv1', new THREE.Float32BufferAttribute(b.uv1, 2));
+      const mesh = new THREE.Mesh(geo, b.mat);
+      mesh.castShadow = this._castShadow; mesh.receiveShadow = true;
+      s.group.add(mesh);
+      s.meshes.push(mesh);
+    }
+    // the way each section comes in: from its side, straight out from the body (arms sideways, the back
+    // from behind, the chest and the face from the front, the legs from their side and a little ahead)
+    const outDir = (s) => {
+      const n = s.name, side = n.endsWith('L') ? 1 : n.endsWith('R') ? -1 : 0;
+      if (n === 'back' || n === 'helmet') return new THREE.Vector3(0, 0, -1);
+      if (n === 'chest' || n === 'face' || n === 'pelvis') return new THREE.Vector3(0, 0, 1);
+      if (/^(upper|fore|hand)/.test(n)) return new THREE.Vector3(side, 0.1, -0.25).normalize();
+      return new THREE.Vector3(side, 0, 0.45).normalize();
+    };
+    this.sections = secs.filter((s) => s.meshes.length).map((s) => {
+      s.group.position.copy(s.centre);
+      this.root.add(s.group);
+      s.out = outDir(s);
+      s.base = s.centre.clone();
+      return s;
+    });
+    // the model's meshes are now the sections' (for the hologram, shadows, materials)
+    this.meshes = this.sections.flatMap((s) => s.meshes);
+    this._originalMats = new Map(this.meshes.map((m) => [m, m.material]));
+    this.pieces = this.sections.map((s) => ({ mesh: s.group, y: s.centre.y, section: s }));
+    this.assemble = this._assembleSections;
+    return this.sections;
+  }
+
+  /**
+   * The assembly line, 0..1. Each section has its own slot in time (section.start, section.span, set by
+   * the scene; evenly spread otherwise) and goes through: waiting on its rack while the robot reaches for
+   * it, lifted off, swung round to just outside its place (along section.carryPath(0..1) when the scene
+   * gives one, the robot's own arc), pushed home, seated. Without a rack (section.rack) it comes in from a
+   * point beside the suit and is hidden until its turn. Returns the index of the last seated section;
+   * section.k is its progress, section.phase 'rack' | 'reach' | 'carry' | 'fit' | 'seated'.
+   */
+  _assembleSections(t) {
+    const n = this.sections.length;
+    let landed = -1;
+    const up = _ax.y;
+    this.sections.forEach((s, i) => {
+      const D = s.span ?? 0.17;
+      const start = s.start ?? (i / n) * (1 - D);
+      const k = clamp((t - start) / D, 0, 1);
+      s.k = k;
+      const g = s.group;
+      const near = _sv1.copy(s.base).addScaledVector(s.out, 0.3);
+      g.rotation.set(0, 0, 0);
+      if (s.rack) {
+        g.visible = true;
+        const lifted = _sv2.copy(s.rack).addScaledVector(up, 0.2);
+        if (k <= 0) { g.position.copy(s.rack); s.phase = 'rack'; }
+        else if (k < REACH) { g.position.copy(s.rack); s.phase = 'reach'; }
+        else if (k < 0.3) { const e = (k - REACH) / (0.3 - REACH); g.position.lerpVectors(s.rack, lifted, e * e * (3 - 2 * e)); s.phase = 'carry'; }
+        else if (k < 0.66) {
+          const e = (k - 0.3) / 0.36, ee = e * e * (3 - 2 * e);
+          if (s.carryPath) g.position.copy(s.carryPath(ee, lifted, near)); else g.position.lerpVectors(lifted, near, ee).addScaledVector(up, Math.sin(ee * Math.PI) * 0.3);
+          s.phase = 'carry';
+        } else if (k < SEATED) { const e = (k - 0.66) / (SEATED - 0.66); g.position.lerpVectors(near, s.base, e * e * (3 - 2 * e)); s.phase = 'fit'; }
+        else { g.position.copy(s.base); s.phase = 'seated'; landed = i; }
+        return;
+      }
+      g.visible = k > 0;
+      const stage = _sv2.copy(s.base).addScaledVector(s.out, 1.25).addScaledVector(up, 0.22);
+      if (k < 0.55) {
+        const e = easeOutCubic(k / 0.55);
+        g.position.lerpVectors(stage, near, e);
+        g.rotation.set((1 - e) * 0.25, (1 - e) * 0.35 * Math.sign(s.out.x || 1), 0);
+        s.phase = 'carry';
+      } else if (k < SEATED) {
+        const e = (k - 0.55) / (SEATED - 0.55);
+        g.position.lerpVectors(near, s.base, e * e * (3 - 2 * e));
+        s.phase = 'fit';
+      } else {
+        g.position.copy(s.base);
+        s.phase = 'seated';
+        landed = i;
+      }
+    });
+    return landed;
+  }
+
   assemble(t) {
     const n = this.pieces.length;
     let landed = -1;
@@ -732,8 +932,11 @@ export class RealSuit {
     if (this.reactorLight) this.reactorLight.intensity = s.reactor * 0.6;
     for (const m of this._emissive) m.emissiveIntensity = m.userData.baseEmissive * (0.06 + s.reactor * 0.6);
     for (const sp of this.eyeSprites || []) sp.material.opacity = s.eyes * 0.8;
-    for (const g of this.eyeGlows || []) { const u = g.material.uniforms?.uGain; if (u) u.value = s.eyes * 4.5 * flick; }
-    for (const g of this.reactorGlows || []) { const u = g.material.uniforms?.uGain; if (u) u.value = s.reactor * 3.2 * flick; }
+    // (on an armor being built section by section, a light shows only once its section is in place)
+    const seated = (name) => { const sec = this.sections?.find((x) => x.name === name); return !sec || sec.k === undefined || sec.k >= SEATED ? 1 : 0; };
+    const eyesOn = this.sections ? seated('face') * seated('helmet') : 1, reactorOn = this.sections ? seated('chest') : 1;
+    for (const g of this.eyeGlows || []) { const u = g.material.uniforms?.uGain; if (u) u.value = s.eyes * 4.5 * flick * eyesOn; }
+    for (const g of this.reactorGlows || []) { const u = g.material.uniforms?.uGain; if (u) u.value = s.reactor * 3.2 * flick * reactorOn; }
     for (const f of this.flames) {
       f.userData.power.value = s.thrust;
       f.scale.y = Math.max(0.001, s.thrust * (0.55 + Math.random() * 0.12) * this.height / 1.9);
